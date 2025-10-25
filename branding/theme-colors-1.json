@@ -1,0 +1,34 @@
+{
+  "colors": [
+    {
+      "theme": "Primary",
+      "name": "Deep Navy",
+      "hex": "#1A2A3A",
+      "meaning": "Stability, trust, precision"
+    },
+    {
+      "theme": "Secondary",
+      "name": "Warm Brick",
+      "hex": "#C14E32",
+      "meaning": "Home, warmth, accessibility"
+    },
+    {
+      "theme": "Accent",
+      "name": "Soft Sky Blue",
+      "hex": "#7BB6E0",
+      "meaning": "Optimism, innovation, technology"
+    },
+    {
+      "theme": "Neutral",
+      "name": "Light Sand",
+      "hex": "#E8E2D0",
+      "meaning": "Earth, affordability, approachability"
+    },
+    {
+      "theme": "Optional Highlight",
+      "name": "Olive Gray",
+      "hex": "#808870",
+      "meaning": "Sustainability, groundedness"
+    }
+  ]
+}

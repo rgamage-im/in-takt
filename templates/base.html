@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}In-Takt - Your window into Takt Homes{% endblock %}</title>
+    
+    <!-- Tailwind CSS CDN (will replace with local build later) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- HTMX -->
+    <script src="https://unpkg.com/htmx.org@2.0.3"></script>
+    
+    <!-- Custom CSS -->
+    <style>
+        :root {
+            --color-deep-navy: #1A2A3A;
+            --color-warm-brick: #C14E32;
+            --color-soft-sky-blue: #7BB6E0;
+            --color-light-sand: #E8E2D0;
+            --color-olive-gray: #808870;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+        }
+    </style>
+    
+    {% block extra_css %}{% endblock %}
+</head>
+<body class="bg-gray-50">
+    <!-- Navigation -->
+    <nav class="shadow-sm" style="background-color: var(--color-deep-navy);">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16">
+                <div class="flex">
+                    <div class="flex-shrink-0 flex items-center">
+                        <h1 class="text-2xl font-bold text-white">In-Takt</h1>
+                        <span class="ml-3 text-sm" style="color: var(--color-light-sand);">Your window into Takt Homes</span>
+                    </div>
+                    <div class="hidden sm:ml-6 sm:flex sm:space-x-8">
+                        <a href="/" class="inline-flex items-center px-1 pt-1 text-sm font-medium text-white border-b-2 border-transparent hover:border-white">
+                            Home
+                        </a>
+                        <a href="/api/docs/" class="inline-flex items-center px-1 pt-1 text-sm font-medium" style="color: var(--color-light-sand);">
+                            API Docs
+                        </a>
+                        <a href="/admin/" class="inline-flex items-center px-1 pt-1 text-sm font-medium" style="color: var(--color-light-sand);">
+                            Admin
+                        </a>
+                    </div>
+                </div>
+                <div class="flex items-center">
+                    {% if user.is_authenticated %}
+                        <span class="text-sm" style="color: var(--color-light-sand);">
+                            Hello, {{ user.username }}
+                        </span>
+                        <a href="/admin/logout/" class="ml-4 px-3 py-2 rounded-md text-sm font-medium text-white hover:bg-gray-700">
+                            Logout
+                        </a>
+                    {% else %}
+                        <a href="/admin/" class="px-3 py-2 rounded-md text-sm font-medium text-white hover:bg-gray-700">
+                            Login
+                        </a>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
+        {% block content %}{% endblock %}
+    </main>
+
+    <!-- Footer -->
+    <footer class="mt-12 py-6" style="background-color: var(--color-deep-navy);">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center" style="color: var(--color-light-sand);">
+            <p>&copy; 2025 Takt Homes. All rights reserved.</p>
+        </div>
+    </footer>
+
+    {% block extra_js %}{% endblock %}
+</body>
+</html>

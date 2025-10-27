@@ -32,8 +32,8 @@
                 <p class="text-sm text-gray-600 mb-4">
                     Access user profiles, calendar events, emails, and SharePoint data through Microsoft Graph API.
                 </p>
-                <a href="#" class="text-sm font-medium hover:underline" style="color: var(--color-warm-brick);">
-                    Explore →
+                <a href="/api/v1/graph/me/" class="text-sm font-medium hover:underline" style="color: var(--color-warm-brick);">
+                    View My Profile →
                 </a>
             </div>
         </div>
@@ -89,6 +89,18 @@
             Quick Actions
         </h2>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <a href="/graph/login/" class="flex items-center p-4 border border-gray-200 rounded-lg hover:border-gray-400 transition-colors">
+                <div class="flex-shrink-0 w-12 h-12 rounded-full flex items-center justify-center" style="background-color: var(--color-soft-sky-blue);">
+                    <svg class="h-6 w-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
+                    </svg>
+                </div>
+                <div class="ml-4">
+                    <h3 class="text-lg font-medium" style="color: var(--color-deep-navy);">Login with Microsoft</h3>
+                    <p class="text-sm text-gray-600">Connect your Microsoft 365 account</p>
+                </div>
+            </a>
+            
             <a href="/admin/" class="flex items-center p-4 border border-gray-200 rounded-lg hover:border-gray-400 transition-colors">
                 <div class="flex-shrink-0 w-12 h-12 rounded-full flex items-center justify-center" style="background-color: var(--color-light-sand);">
                     <svg class="h-6 w-6" style="color: var(--color-deep-navy);" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -99,18 +111,6 @@
                 <div class="ml-4">
                     <h3 class="text-lg font-medium" style="color: var(--color-deep-navy);">Admin Panel</h3>
                     <p class="text-sm text-gray-600">Manage users, data, and settings</p>
-                </div>
-            </a>
-            
-            <a href="#" class="flex items-center p-4 border border-gray-200 rounded-lg hover:border-gray-400 transition-colors">
-                <div class="flex-shrink-0 w-12 h-12 rounded-full flex items-center justify-center" style="background-color: var(--color-light-sand);">
-                    <svg class="h-6 w-6" style="color: var(--color-deep-navy);" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
-                    </svg>
-                </div>
-                <div class="ml-4">
-                    <h3 class="text-lg font-medium" style="color: var(--color-deep-navy);">Search Data</h3>
-                    <p class="text-sm text-gray-600">Query across all data sources</p>
                 </div>
             </a>
         </div>

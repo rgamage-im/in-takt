@@ -26,8 +26,9 @@ urlpatterns = [
     # Admin
     path("admin/", admin.site.urls),
     
-    # App URLs (to be added later)
-    # path("api/", include("api.urls")),
-    # path("graph/", include("msgraph_integration.urls")),
-    # path("quickbooks/", include("quickbooks_integration.urls")),
+    # Microsoft Graph OAuth and Profile
+    path("graph/", include("msgraph_integration.urls")),
+    
+    # API endpoints
+    path("api/", include("api.urls")),
 ]

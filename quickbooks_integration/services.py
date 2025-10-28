@@ -233,8 +233,8 @@ class QuickBooksService:
         realm_id: str,
         max_results: int = 100
     ) -> Dict[str, Any]:
-        """List invoices"""
-        query = f"SELECT * FROM Invoice MAXRESULTS {max_results}"
+        """List invoices - returns most recent first"""
+        query = f"SELECT * FROM Invoice ORDERBY TxnDate DESC MAXRESULTS {max_results}"
         return self._make_api_request(
             access_token,
             realm_id,
@@ -278,8 +278,8 @@ class QuickBooksService:
         realm_id: str,
         max_results: int = 100
     ) -> Dict[str, Any]:
-        """List expenses"""
-        query = f"SELECT * FROM Purchase WHERE PaymentType = 'Cash' MAXRESULTS {max_results}"
+        """List expenses - returns most recent first"""
+        query = f"SELECT * FROM Purchase WHERE PaymentType = 'Cash' ORDERBY TxnDate DESC MAXRESULTS {max_results}"
         return self._make_api_request(
             access_token,
             realm_id,

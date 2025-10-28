@@ -206,8 +206,6 @@
             // Hide loading overlay when data arrives
             document.getElementById('loading-overlay').style.display = 'none';
             
-            console.log('API Response:', response);
-            
             // Extract expenses array from response
             let expenses = [];
             if (response.QueryResponse && response.QueryResponse.Purchase) {
@@ -217,8 +215,6 @@
             } else if (response.Purchase) {
                 expenses = response.Purchase;
             }
-            
-            console.log('Expenses array:', expenses);
             
             // Update stats
             updateStats(expenses);

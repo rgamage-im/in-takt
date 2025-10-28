@@ -196,8 +196,6 @@ document.addEventListener('DOMContentLoaded', function() {
             // Hide loading overlay when data arrives
             document.getElementById('loading-overlay').style.display = 'none';
             
-            console.log('API Response:', response);
-            
             // Extract invoices array from response
             let invoices = [];
             if (response.QueryResponse && response.QueryResponse.Invoice) {
@@ -207,8 +205,6 @@ document.addEventListener('DOMContentLoaded', function() {
             } else if (response.Invoice) {
                 invoices = response.Invoice;
             }
-            
-            console.log('Invoices array:', invoices);
             
             // Update stats
             updateStats(invoices);

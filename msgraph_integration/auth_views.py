@@ -2,11 +2,9 @@
 Authentication views for Microsoft Graph OAuth 2.0 flow
 """
 import secrets
-from django.shortcuts import redirect
+from django.shortcuts import redirect, render
 from django.http import JsonResponse, HttpResponse
 from django.views import View
-from django.contrib.auth.decorators import login_required
-from django.utils.decorators import method_decorator
 
 from .services_delegated import GraphServiceDelegated
 
@@ -93,7 +91,6 @@ class GraphLogoutView(View):
         return redirect('home')
 
 
-@method_decorator(login_required, name='dispatch')
 class MyProfilePageView(View):
     """
     Display current user's Microsoft Graph profile (HTML page)
@@ -103,8 +100,6 @@ class MyProfilePageView(View):
         """
         Show user profile page
         """
-        from django.shortcuts import render
-        
         access_token = request.session.get('graph_access_token')
         
         context = {
@@ -115,10 +110,11 @@ class MyProfilePageView(View):
             try:
                 graph_service = GraphServiceDelegated()
                 profile = graph_service.get_my_profile(access_token)
-                context['profile'] = profile
+                context['user_profile'] = profile  # Changed from 'profile' to 'user_profile'
             except Exception as e:
                 context['error'] = str(e)
                 # Token might be expired, clear it
                 request.session.pop('graph_access_token', None)
         
         return render(request, 'msgraph/profile.html', context)
+

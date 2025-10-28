@@ -29,6 +29,9 @@ urlpatterns = [
     # Microsoft Graph OAuth and Profile
     path("graph/", include("msgraph_integration.urls")),
     
+    # QuickBooks OAuth and Dashboard
+    path("quickbooks/", include("quickbooks_integration.urls")),
+    
     # API endpoints
     path("api/", include("api.urls")),
 ]

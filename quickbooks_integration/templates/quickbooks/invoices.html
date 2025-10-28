@@ -1,0 +1,362 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}QuickBooks Invoices - In-Takt{% endblock %}
+
+{% block extra_css %}
+<!-- Tabulator CSS -->
+<link href="https://unpkg.com/tabulator-tables@6.2.5/dist/css/tabulator.min.css" rel="stylesheet">
+<!-- Luxon for date handling -->
+<script src="https://cdn.jsdelivr.net/npm/luxon@3.4.4/build/global/luxon.min.js"></script>
+<style>
+    /* Tabulator theme customization */
+    .tabulator {
+        font-size: 14px;
+        border: 1px solid #dee2e6;
+    }
+    
+    .tabulator-header {
+        background-color: var(--color-deep-navy) !important;
+        color: white !important;
+        border: none;
+    }
+    
+    .tabulator-header .tabulator-col {
+        background-color: var(--color-deep-navy) !important;
+        border-right: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    
+    .tabulator-header .tabulator-col-title {
+        color: white !important;
+    }
+    
+    /* Header filter input styling */
+    .tabulator-header-filter input {
+        color: #1A2A3A !important;
+        background-color: white !important;
+        border: 1px solid #cbd5e0 !important;
+        padding: 4px 8px !important;
+    }
+    
+    .tabulator-header-filter input::placeholder {
+        color: #a0aec0 !important;
+    }
+    
+    .tabulator-row:hover {
+        background-color: rgba(123, 182, 224, 0.1) !important;
+    }
+    
+    .tabulator-row.tabulator-selected {
+        background-color: rgba(193, 78, 50, 0.1) !important;
+    }
+    
+    .tabulator .tabulator-footer {
+        background-color: var(--color-light-sand);
+        border-top: 2px solid var(--color-deep-navy);
+    }
+    
+    /* Loading overlay */
+    #loading-overlay {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(255, 255, 255, 0.9);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 1000;
+    }
+    
+    .spinner {
+        border: 4px solid var(--color-light-sand);
+        border-top: 4px solid var(--color-warm-brick);
+        border-radius: 50%;
+        width: 40px;
+        height: 40px;
+        animation: spin 1s linear infinite;
+    }
+    
+    @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="px-4 py-6 sm:px-0">
+    <!-- Header -->
+    <div class="mb-6">
+        <div class="flex items-center justify-between">
+            <div>
+                <h1 class="text-3xl font-bold" style="color: var(--color-deep-navy);">
+                    QuickBooks Invoices
+                </h1>
+                <p class="mt-2 text-sm" style="color: var(--color-olive-gray);">
+                    View and search all invoices from QuickBooks
+                </p>
+            </div>
+            <div class="flex gap-3">
+                <a href="/quickbooks/dashboard/" class="px-4 py-2 rounded-md text-white font-medium hover:opacity-90 transition-opacity" style="background-color: var(--color-warm-brick);">
+                    ← Back to Dashboard
+                </a>
+                <a href="/quickbooks/api/invoices/" class="px-4 py-2 rounded-md text-white font-medium hover:opacity-90 transition-opacity" style="background-color: var(--color-olive-gray);">
+                    View Raw API
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Stats Cards -->
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+        <div class="bg-white rounded-lg shadow p-4 border-l-4" style="border-left-color: var(--color-warm-brick);">
+            <div class="text-sm font-medium" style="color: var(--color-olive-gray);">Total Invoices</div>
+            <div id="stat-total" class="text-2xl font-bold mt-1" style="color: var(--color-deep-navy);">-</div>
+        </div>
+        <div class="bg-white rounded-lg shadow p-4 border-l-4" style="border-left-color: var(--color-soft-sky-blue);">
+            <div class="text-sm font-medium" style="color: var(--color-olive-gray);">Total Amount</div>
+            <div id="stat-amount" class="text-2xl font-bold mt-1" style="color: var(--color-deep-navy);">-</div>
+        </div>
+        <div class="bg-white rounded-lg shadow p-4 border-l-4" style="border-left-color: var(--color-olive-gray);">
+            <div class="text-sm font-medium" style="color: var(--color-olive-gray);">Avg Invoice</div>
+            <div id="stat-avg" class="text-2xl font-bold mt-1" style="color: var(--color-deep-navy);">-</div>
+        </div>
+        <div class="bg-white rounded-lg shadow p-4 border-l-4" style="border-left-color: #48BB78;">
+            <div class="text-sm font-medium" style="color: var(--color-olive-gray);">This Month</div>
+            <div id="stat-month" class="text-2xl font-bold mt-1" style="color: var(--color-deep-navy);">-</div>
+        </div>
+    </div>
+
+    <!-- Table Container -->
+    <div class="bg-white rounded-lg shadow-lg p-6" style="position: relative; min-height: 500px;">
+        <div id="loading-overlay">
+            <div class="spinner"></div>
+        </div>
+        
+        <div class="mb-4">
+            <h2 class="text-lg font-semibold mb-2" style="color: var(--color-deep-navy);">Invoice List</h2>
+            <p class="text-sm" style="color: var(--color-olive-gray);">
+                Click column headers to sort • Use search to filter results • Click rows for details
+            </p>
+        </div>
+        
+        <div id="invoices-table"></div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<!-- Tabulator JS -->
+<script type="text/javascript" src="https://unpkg.com/tabulator-tables@6.2.5/dist/js/tabulator.min.js"></script>
+
+<script>
+// Initialize Tabulator when page loads
+document.addEventListener('DOMContentLoaded', function() {
+    
+    // Money formatter
+    var moneyFormatter = function(cell, formatterParams, onRendered){
+        var value = cell.getValue();
+        if (value === null || value === undefined) return "-";
+        return "$" + parseFloat(value).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+    };
+    
+    // Date formatter
+    var dateFormatter = function(cell, formatterParams, onRendered){
+        var value = cell.getValue();
+        if (!value) return "-";
+        var date = new Date(value);
+        return date.toLocaleDateString('en-US', {year: 'numeric', month: 'short', day: 'numeric'});
+    };
+    
+    // Status formatter with colors
+    var statusFormatter = function(cell, formatterParams, onRendered){
+        var value = cell.getValue();
+        var colors = {
+            'Paid': 'background-color: #48BB78; color: white;',
+            'Unpaid': 'background-color: #F56565; color: white;',
+            'Pending': 'background-color: #ECC94B; color: black;',
+            'Overdue': 'background-color: #E53E3E; color: white;'
+        };
+        var style = colors[value] || 'background-color: #CBD5E0; color: black;';
+        return '<span style="padding: 2px 8px; border-radius: 4px; font-size: 12px; font-weight: 600; ' + style + '">' + (value || 'Unknown') + '</span>';
+    };
+    
+    // Initialize the table
+    var table = new Tabulator("#invoices-table", {
+        ajaxURL: "/quickbooks/api/invoices/",
+        ajaxConfig: {
+            credentials: "same-origin",
+            headers: {
+                "X-Requested-With": "XMLHttpRequest",
+            }
+        },
+        ajaxResponse: function(url, params, response){
+            // Hide loading overlay when data arrives
+            document.getElementById('loading-overlay').style.display = 'none';
+            
+            console.log('API Response:', response);
+            
+            // Extract invoices array from response
+            let invoices = [];
+            if (response.QueryResponse && response.QueryResponse.Invoice) {
+                invoices = response.QueryResponse.Invoice;
+            } else if (Array.isArray(response)) {
+                invoices = response;
+            } else if (response.Invoice) {
+                invoices = response.Invoice;
+            }
+            
+            console.log('Invoices array:', invoices);
+            
+            // Update stats
+            updateStats(invoices);
+            
+            // Return the invoices array
+            return invoices;
+        },
+        layout: "fitDataFill",
+        pagination: true,
+        paginationSize: 25,
+        paginationSizeSelector: [10, 25, 50, 100],
+        movableColumns: true,
+        resizableColumns: true,
+        initialSort: [
+            {column: "TxnDate", dir: "desc"}
+        ],
+        columns: [
+            {
+                title: "Invoice #", 
+                field: "DocNumber", 
+                sorter: "number",
+                width: 120,
+                headerFilter: "input"
+            },
+            {
+                title: "Date", 
+                field: "TxnDate", 
+                sorter: function(a, b, aRow, bRow, column, dir, sorterParams){
+                    var aDate = a ? new Date(a).getTime() : 0;
+                    var bDate = b ? new Date(b).getTime() : 0;
+                    return aDate - bDate;
+                },
+                formatter: dateFormatter,
+                width: 120,
+                headerFilter: "input"
+            },
+            {
+                title: "Customer", 
+                field: "CustomerRef",
+                formatter: function(cell, formatterParams, onRendered){
+                    var value = cell.getValue();
+                    return value?.name || "-";
+                },
+                sorter: function(a, b, aRow, bRow, column, dir, sorterParams){
+                    var aVal = a?.name || "";
+                    var bVal = b?.name || "";
+                    return aVal.localeCompare(bVal);
+                },
+                headerFilter: "input",
+                headerFilterFunc: function(headerValue, rowValue, rowData, filterParams){
+                    var customerName = rowValue?.name || "";
+                    return customerName.toLowerCase().includes(headerValue.toLowerCase());
+                },
+                minWidth: 200
+            },
+            {
+                title: "Email",
+                field: "BillEmail",
+                formatter: function(cell, formatterParams, onRendered){
+                    var value = cell.getValue();
+                    return value?.Address || "-";
+                },
+                sorter: function(a, b, aRow, bRow, column, dir, sorterParams){
+                    var aVal = a?.Address || "";
+                    var bVal = b?.Address || "";
+                    return aVal.localeCompare(bVal);
+                },
+                headerFilter: "input",
+                headerFilterFunc: function(headerValue, rowValue, rowData, filterParams){
+                    var emailAddress = rowValue?.Address || "";
+                    return emailAddress.toLowerCase().includes(headerValue.toLowerCase());
+                },
+                minWidth: 200
+            },
+            {
+                title: "Total Amount", 
+                field: "TotalAmt", 
+                sorter: "number",
+                formatter: moneyFormatter,
+                width: 130,
+                headerFilter: "number",
+                headerFilterFunc: ">=",
+                hozAlign: "right"
+            },
+            {
+                title: "Balance", 
+                field: "Balance", 
+                sorter: "number",
+                formatter: moneyFormatter,
+                width: 130,
+                hozAlign: "right"
+            },
+            {
+                title: "Due Date", 
+                field: "DueDate", 
+                sorter: function(a, b, aRow, bRow, column, dir, sorterParams){
+                    var aDate = a ? new Date(a).getTime() : 0;
+                    var bDate = b ? new Date(b).getTime() : 0;
+                    return aDate - bDate;
+                },
+                formatter: dateFormatter,
+                width: 120
+            }
+        ],
+        rowClick: function(e, row){
+            // Handle row click - could open detail view
+            var data = row.getData();
+            console.log("Invoice clicked:", data);
+            // Future: Open modal or navigate to detail page
+            alert("Invoice #" + data.DocNumber + "\nCustomer: " + data.CustomerRef.name + "\nAmount: $" + data.TotalAmt);
+        }
+    });
+    
+    // Update statistics
+    function updateStats(invoices) {
+        if (!invoices || invoices.length === 0) return;
+        
+        // Total count
+        document.getElementById('stat-total').textContent = invoices.length;
+        
+        // Total amount
+        var totalAmount = invoices.reduce((sum, inv) => sum + (parseFloat(inv.TotalAmt) || 0), 0);
+        document.getElementById('stat-amount').textContent = '$' + totalAmount.toLocaleString('en-US', {minimumFractionDigits: 2});
+        
+        // Average
+        var avgAmount = totalAmount / invoices.length;
+        document.getElementById('stat-avg').textContent = '$' + avgAmount.toLocaleString('en-US', {minimumFractionDigits: 2});
+        
+        // This month
+        var currentMonth = new Date().getMonth();
+        var currentYear = new Date().getFullYear();
+        var thisMonthCount = invoices.filter(inv => {
+            var invDate = new Date(inv.TxnDate);
+            return invDate.getMonth() === currentMonth && invDate.getFullYear() === currentYear;
+        }).length;
+        document.getElementById('stat-month').textContent = thisMonthCount;
+    }
+    
+    // Download buttons (optional - uncomment to add export functionality)
+    /*
+    document.getElementById('download-csv')?.addEventListener('click', function(){
+        table.download("csv", "invoices.csv");
+    });
+    
+    document.getElementById('download-xlsx')?.addEventListener('click', function(){
+        table.download("xlsx", "invoices.xlsx", {sheetName:"Invoices"});
+    });
+    */
+});
+</script>
+{% endblock %}

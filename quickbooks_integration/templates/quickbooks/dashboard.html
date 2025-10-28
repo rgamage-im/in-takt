@@ -104,12 +104,22 @@
                         View Customers
                     </div>
                 </a>
-                <a href="{% url 'quickbooks:api-invoices' %}" class="block px-4 py-3 rounded-lg transition-colors group hover-brick">
+                <a href="{% url 'quickbooks:invoices' %}" class="block px-4 py-3 rounded-lg transition-colors group hover-brick">
                     <div class="flex items-center group-hover:text-white" style="color: var(--color-deep-navy);">
                         <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
                         </svg>
                         View Invoices
+                        <span class="ml-auto text-xs px-2 py-1 rounded" style="background-color: var(--color-warm-brick); color: white;">Table</span>
+                    </div>
+                </a>
+                <a href="{% url 'quickbooks:api-invoices' %}" class="block px-4 py-3 rounded-lg transition-colors group hover-brick">
+                    <div class="flex items-center group-hover:text-white" style="color: var(--color-deep-navy);">
+                        <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"></path>
+                        </svg>
+                        View Invoices API
+                        <span class="ml-auto text-xs px-2 py-1 rounded" style="background-color: var(--color-olive-gray); color: white;">JSON</span>
                     </div>
                 </a>
                 <a href="{% url 'quickbooks:api-vendors' %}" class="block px-4 py-3 rounded-lg transition-colors group hover-brick">

@@ -196,3 +196,21 @@ class QuickBooksCompanyInfoView(View):
             return JsonResponse(company_info)
         except Exception as e:
             return JsonResponse({'error': str(e)}, status=500)
+
+
+class QuickBooksInvoicesView(View):
+    """
+    Display invoices in a table view using Tabulator
+    """
+    
+    def get(self, request):
+        # Check if user is authenticated with QuickBooks
+        access_token = request.session.get('qb_access_token')
+        realm_id = request.session.get('qb_realm_id')
+        
+        if not access_token or not realm_id:
+            messages.warning(request, 'Please connect to QuickBooks to view invoices.')
+            return redirect('quickbooks:qb-login')
+        
+        # Render the template - Tabulator will fetch data via AJAX
+        return render(request, 'quickbooks/invoices.html')

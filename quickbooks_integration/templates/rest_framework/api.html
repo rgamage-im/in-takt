@@ -1,0 +1,29 @@
+{% extends "rest_framework/base.html" %}
+
+{% block branding %}
+<a class="navbar-brand" rel="nofollow" href="/" style="display: inline-flex; align-items: center; gap: 8px; padding: 10px 15px; background-color: #1A2A3A; color: white; text-decoration: none; border-radius: 4px; font-weight: 500; font-size: 14px;">
+    🏠 InTakt Home
+</a>
+<a class="navbar-brand" rel="nofollow" href="/quickbooks/dashboard/" style="display: inline-flex; align-items: center; gap: 8px; margin-left: 10px; padding: 10px 15px; background-color: #C14E32; color: white; text-decoration: none; border-radius: 4px; font-weight: 500; font-size: 14px;">
+    QuickBooks Dashboard
+</a>
+{% endblock %}
+
+{% block style %}
+{{ block.super }}
+<style>
+    /* Add some spacing to the branding area */
+    .navbar-brand:hover {
+        opacity: 0.9;
+    }
+    
+    /* Style the page header */
+    .content-main > h1:first-child {
+        color: #1A2A3A;
+        font-weight: 600;
+        margin-bottom: 10px;
+        padding-bottom: 10px;
+        border-bottom: 2px solid #C14E32;
+    }
+</style>
+{% endblock %}

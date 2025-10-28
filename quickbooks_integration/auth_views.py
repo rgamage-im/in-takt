@@ -214,3 +214,21 @@ class QuickBooksInvoicesView(View):
         
         # Render the template - Tabulator will fetch data via AJAX
         return render(request, 'quickbooks/invoices.html')
+
+
+class QuickBooksExpensesView(View):
+    """
+    Display expenses in a table view using Tabulator
+    """
+    
+    def get(self, request):
+        # Check if user is authenticated with QuickBooks
+        access_token = request.session.get('qb_access_token')
+        realm_id = request.session.get('qb_realm_id')
+        
+        if not access_token or not realm_id:
+            messages.warning(request, 'Please connect to QuickBooks to view expenses.')
+            return redirect('quickbooks:qb-login')
+        
+        # Render the template - Tabulator will fetch data via AJAX
+        return render(request, 'quickbooks/expenses.html')

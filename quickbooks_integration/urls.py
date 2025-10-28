@@ -9,6 +9,7 @@ from .auth_views import (
     QuickBooksDashboardView,
     QuickBooksCompanyInfoView,
     QuickBooksInvoicesView,
+    QuickBooksExpensesView,
 )
 from .api_views import (
     QuickBooksCustomersAPIView,
@@ -32,6 +33,7 @@ urlpatterns = [
     path('dashboard/', QuickBooksDashboardView.as_view(), name='dashboard'),
     path('company-info/', QuickBooksCompanyInfoView.as_view(), name='company-info'),
     path('invoices/', QuickBooksInvoicesView.as_view(), name='invoices'),
+    path('expenses/', QuickBooksExpensesView.as_view(), name='expenses'),
     
     # API Routes (JSON)
     path('api/customers/', QuickBooksCustomersAPIView.as_view(), name='api-customers'),

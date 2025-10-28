@@ -1,0 +1,327 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}QuickBooks Expenses - In-Takt{% endblock %}
+
+{% block extra_css %}
+<!-- Tabulator CSS -->
+<link href="https://unpkg.com/tabulator-tables@6.2.5/dist/css/tabulator.min.css" rel="stylesheet">
+<!-- Luxon for date handling -->
+<script src="https://cdn.jsdelivr.net/npm/luxon@3.4.4/build/global/luxon.min.js"></script>
+<style>
+    /* Tabulator theme customization */
+    .tabulator {
+        font-size: 14px;
+        border: 1px solid #dee2e6;
+    }
+    
+    .tabulator-header {
+        background-color: var(--color-deep-navy) !important;
+        color: white !important;
+        border: none;
+    }
+    
+    .tabulator-header .tabulator-col {
+        background-color: var(--color-deep-navy) !important;
+        border-right: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    
+    .tabulator-header .tabulator-col-title {
+        color: white !important;
+    }
+    
+    /* Header filter input styling */
+    .tabulator-header-filter input {
+        color: #1A2A3A !important;
+        background-color: white !important;
+        border: 1px solid #cbd5e0 !important;
+        padding: 4px 8px !important;
+    }
+    
+    .tabulator-header-filter input::placeholder {
+        color: #a0aec0 !important;
+    }
+    
+    .tabulator-row:hover {
+        background-color: rgba(123, 182, 224, 0.1) !important;
+    }
+    
+    .tabulator-row.tabulator-selected {
+        background-color: rgba(193, 78, 50, 0.1) !important;
+    }
+    
+    .tabulator .tabulator-footer {
+        background-color: var(--color-light-sand);
+        border-top: 2px solid var(--color-deep-navy);
+    }
+    
+    /* Loading overlay */
+    #loading-overlay {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(255, 255, 255, 0.9);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 1000;
+    }
+    
+    .spinner {
+        border: 4px solid var(--color-light-sand);
+        border-top: 4px solid var(--color-warm-brick);
+        border-radius: 50%;
+        width: 40px;
+        height: 40px;
+        animation: spin 1s linear infinite;
+    }
+    
+    @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="px-4 py-6 sm:px-0">
+    <!-- Header -->
+    <div class="mb-6">
+        <div class="flex items-center justify-between">
+            <div>
+                <h1 class="text-3xl font-bold" style="color: var(--color-deep-navy);">
+                    QuickBooks Expenses
+                </h1>
+                <p class="mt-2 text-sm" style="color: var(--color-olive-gray);">
+                    View and search all expenses from QuickBooks
+                </p>
+            </div>
+            <div class="flex gap-3">
+                <a href="/quickbooks/dashboard/" class="px-4 py-2 rounded-md text-white font-medium hover:opacity-90 transition-opacity" style="background-color: var(--color-warm-brick);">
+                    ← Back to Dashboard
+                </a>
+                <a href="/quickbooks/api/expenses/" class="px-4 py-2 rounded-md text-white font-medium hover:opacity-90 transition-opacity" style="background-color: var(--color-olive-gray);">
+                    View Raw API →
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Statistics Cards -->
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
+        <div class="bg-white rounded-lg shadow p-6 border-t-4" style="border-color: var(--color-warm-brick);">
+            <div class="text-sm font-medium" style="color: var(--color-olive-gray);">Total Expenses</div>
+            <div class="mt-2 text-3xl font-bold" style="color: var(--color-deep-navy);" id="total-expenses">0</div>
+        </div>
+        <div class="bg-white rounded-lg shadow p-6 border-t-4" style="border-color: var(--color-soft-sky-blue);">
+            <div class="text-sm font-medium" style="color: var(--color-olive-gray);">Total Amount</div>
+            <div class="mt-2 text-3xl font-bold" style="color: var(--color-deep-navy);" id="total-amount">$0.00</div>
+        </div>
+        <div class="bg-white rounded-lg shadow p-6 border-t-4" style="border-color: var(--color-olive-gray);">
+            <div class="text-sm font-medium" style="color: var(--color-olive-gray);">Avg Expense</div>
+            <div class="mt-2 text-3xl font-bold" style="color: var(--color-deep-navy);" id="avg-expense">$0.00</div>
+        </div>
+        <div class="bg-white rounded-lg shadow p-6 border-t-4" style="border-color: var(--color-light-sand);">
+            <div class="text-sm font-medium" style="color: var(--color-olive-gray);">This Month</div>
+            <div class="mt-2 text-3xl font-bold" style="color: var(--color-deep-navy);" id="this-month">0</div>
+        </div>
+    </div>
+
+    <!-- Table Container -->
+    <div class="bg-white rounded-lg shadow relative">
+        <!-- Loading Overlay -->
+        <div id="loading-overlay">
+            <div class="spinner"></div>
+        </div>
+        
+        <div id="expenses-table"></div>
+    </div>
+</div>
+
+<!-- Tabulator JS -->
+<script src="https://unpkg.com/tabulator-tables@6.2.5/dist/js/tabulator.min.js"></script>
+<script>
+    // Money formatter
+    var moneyFormatter = function(cell, formatterParams, onRendered){
+        var value = cell.getValue();
+        if (!value && value !== 0) return "-";
+        return "$" + parseFloat(value).toFixed(2).replace(/\d(?=(\d{3})+\.)/g, '$&,');
+    };
+    
+    // Date formatter
+    var dateFormatter = function(cell, formatterParams, onRendered){
+        var value = cell.getValue();
+        if (!value) return "-";
+        var date = new Date(value);
+        return date.toLocaleDateString('en-US', {year: 'numeric', month: 'short', day: 'numeric'});
+    };
+    
+    // Payment method formatter
+    var paymentMethodFormatter = function(cell, formatterParams, onRendered){
+        var value = cell.getValue();
+        var colors = {
+            'Cash': 'background-color: #48BB78; color: white;',
+            'Check': 'background-color: #4299E1; color: white;',
+            'CreditCard': 'background-color: #9F7AEA; color: white;'
+        };
+        var style = colors[value] || 'background-color: #CBD5E0; color: black;';
+        return '<span style="padding: 2px 8px; border-radius: 4px; font-size: 12px; font-weight: 600; ' + style + '">' + (value || 'Unknown') + '</span>';
+    };
+    
+    // Function to update statistics
+    function updateStats(expenses) {
+        var total = expenses.length;
+        var totalAmount = expenses.reduce(function(sum, exp) { 
+            return sum + (parseFloat(exp.TotalAmt) || 0); 
+        }, 0);
+        var avgAmount = total > 0 ? totalAmount / total : 0;
+        
+        // Count expenses from this month
+        var now = new Date();
+        var thisMonth = expenses.filter(function(exp) {
+            if (!exp.TxnDate) return false;
+            var expDate = new Date(exp.TxnDate);
+            return expDate.getMonth() === now.getMonth() && 
+                   expDate.getFullYear() === now.getFullYear();
+        }).length;
+        
+        document.getElementById('total-expenses').textContent = total;
+        document.getElementById('total-amount').textContent = '$' + totalAmount.toFixed(2).replace(/\d(?=(\d{3})+\.)/g, '$&,');
+        document.getElementById('avg-expense').textContent = '$' + avgAmount.toFixed(2).replace(/\d(?=(\d{3})+\.)/g, '$&,');
+        document.getElementById('this-month').textContent = thisMonth;
+    }
+    
+    // Initialize the table
+    var table = new Tabulator("#expenses-table", {
+        ajaxURL: "/quickbooks/api/expenses/",
+        ajaxConfig: {
+            credentials: "same-origin",
+            headers: {
+                "X-Requested-With": "XMLHttpRequest",
+            }
+        },
+        ajaxResponse: function(url, params, response){
+            // Hide loading overlay when data arrives
+            document.getElementById('loading-overlay').style.display = 'none';
+            
+            console.log('API Response:', response);
+            
+            // Extract expenses array from response
+            let expenses = [];
+            if (response.QueryResponse && response.QueryResponse.Purchase) {
+                expenses = response.QueryResponse.Purchase;
+            } else if (Array.isArray(response)) {
+                expenses = response;
+            } else if (response.Purchase) {
+                expenses = response.Purchase;
+            }
+            
+            console.log('Expenses array:', expenses);
+            
+            // Update stats
+            updateStats(expenses);
+            
+            // Return the expenses array
+            return expenses;
+        },
+        layout: "fitDataFill",
+        pagination: true,
+        paginationSize: 25,
+        paginationSizeSelector: [10, 25, 50, 100],
+        movableColumns: true,
+        resizableColumns: true,
+        initialSort: [
+            {column: "TxnDate", dir: "desc"}
+        ],
+        columns: [
+            {
+                title: "ID", 
+                field: "Id", 
+                sorter: "number",
+                width: 80,
+                headerFilter: "input"
+            },
+            {
+                title: "Date", 
+                field: "TxnDate", 
+                sorter: function(a, b, aRow, bRow, column, dir, sorterParams){
+                    var aDate = a ? new Date(a).getTime() : 0;
+                    var bDate = b ? new Date(b).getTime() : 0;
+                    return aDate - bDate;
+                },
+                formatter: dateFormatter,
+                width: 120,
+                headerFilter: "input"
+            },
+            {
+                title: "Vendor", 
+                field: "EntityRef",
+                formatter: function(cell, formatterParams, onRendered){
+                    var value = cell.getValue();
+                    return value?.name || "-";
+                },
+                sorter: function(a, b, aRow, bRow, column, dir, sorterParams){
+                    var aVal = a?.name || "";
+                    var bVal = b?.name || "";
+                    return aVal.localeCompare(bVal);
+                },
+                headerFilter: "input",
+                headerFilterFunc: function(headerValue, rowValue, rowData, filterParams){
+                    var vendorName = rowValue?.name || "";
+                    return vendorName.toLowerCase().includes(headerValue.toLowerCase());
+                },
+                minWidth: 200
+            },
+            {
+                title: "Payment Method",
+                field: "PaymentType",
+                formatter: paymentMethodFormatter,
+                sorter: "string",
+                headerFilter: "input",
+                width: 150
+            },
+            {
+                title: "Account", 
+                field: "AccountRef",
+                formatter: function(cell, formatterParams, onRendered){
+                    var value = cell.getValue();
+                    return value?.name || "-";
+                },
+                sorter: function(a, b, aRow, bRow, column, dir, sorterParams){
+                    var aVal = a?.name || "";
+                    var bVal = b?.name || "";
+                    return aVal.localeCompare(bVal);
+                },
+                headerFilter: "input",
+                headerFilterFunc: function(headerValue, rowValue, rowData, filterParams){
+                    var accountName = rowValue?.name || "";
+                    return accountName.toLowerCase().includes(headerValue.toLowerCase());
+                },
+                minWidth: 180
+            },
+            {
+                title: "Total Amount", 
+                field: "TotalAmt", 
+                sorter: "number",
+                formatter: moneyFormatter,
+                width: 130,
+                headerFilter: "number",
+                headerFilterFunc: ">=",
+                hozAlign: "right"
+            }
+        ],
+        rowClick: function(e, row){
+            var data = row.getData();
+            alert("Expense Details:\n\n" + 
+                  "ID: " + (data.Id || "N/A") + "\n" +
+                  "Date: " + (data.TxnDate || "N/A") + "\n" +
+                  "Vendor: " + (data.EntityRef?.name || "N/A") + "\n" +
+                  "Amount: $" + (data.TotalAmt || 0) + "\n" +
+                  "Payment Type: " + (data.PaymentType || "N/A"));
+            // Future: Open modal or navigate to detail page
+        }
+    });
+</script>
+{% endblock %}

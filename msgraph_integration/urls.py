@@ -3,7 +3,7 @@ Microsoft Graph Integration URLs
 """
 from django.urls import path
 from .views import UserProfileView, UserListView, UserSearchView
-from .auth_views import GraphLoginView, GraphCallbackView, GraphLogoutView, MyProfilePageView
+from .auth_views import GraphLoginView, GraphCallbackView, GraphLogoutView, MyProfilePageView, GraphExploreView
 from .api_views import MyProfileAPIView, MyMessagesAPIView, MyCalendarAPIView
 
 app_name = 'msgraph'
@@ -13,6 +13,9 @@ urlpatterns = [
     path('login/', GraphLoginView.as_view(), name='graph-login'),
     path('callback/', GraphCallbackView.as_view(), name='graph-callback'),
     path('logout/', GraphLogoutView.as_view(), name='graph-logout'),
+    
+    # Explore - Auto-login if needed
+    path('explore/', GraphExploreView.as_view(), name='graph-explore'),
     
     # Profile Page (HTML)
     path('profile/', MyProfilePageView.as_view(), name='my-profile-page'),

@@ -121,3 +121,27 @@ class MyProfilePageView(View):
         
         return render(request, 'msgraph/profile.html', context)
 
+
+class GraphExploreView(View):
+    """
+    Entry point for exploring Microsoft 365 data.
+    Automatically handles authentication if needed.
+    """
+    
+    def get(self, request):
+        """
+        Check if user is authenticated with Graph.
+        If yes, show profile page with access to messages, calendar, etc.
+        If no, redirect to login then to profile page.
+        """
+        access_token = request.session.get('graph_access_token')
+        
+        if access_token:
+            # User is already authenticated, show the profile/dashboard
+            return redirect('msgraph:my-profile-page')
+        else:
+            # User needs to authenticate first
+            # Store the intended destination so we can redirect after login
+            request.session['graph_next'] = 'msgraph:my-profile-page'
+            return redirect('msgraph:graph-login')
+

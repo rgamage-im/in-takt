@@ -53,6 +53,8 @@ INSTALLED_APPS = [
     "drf_spectacular",
     "django_htmx",
     "corsheaders",
+    # Social Authentication (SSO)
+    "social_django",
 ]
 
 MIDDLEWARE = [
@@ -77,6 +79,9 @@ TEMPLATES = [
                 "django.template.context_processors.request",
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
+                # Social Auth context processors
+                "social_django.context_processors.backends",
+                "social_django.context_processors.login_redirect",
             ],
         },
     },
@@ -138,6 +143,52 @@ STATICFILES_DIRS = [BASE_DIR / "static"]
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+# Authentication settings
+LOGIN_URL = '/login/azuread-tenant-oauth2/'
+LOGIN_REDIRECT_URL = '/'
+LOGOUT_REDIRECT_URL = '/'
+
+# Social Auth Configuration for Azure AD SSO
+AUTHENTICATION_BACKENDS = [
+    'social_core.backends.azuread_tenant.AzureADTenantOAuth2',
+    'django.contrib.auth.backends.ModelBackend',  # Fallback for admin/superuser
+]
+
+# Azure AD SSO Settings
+SOCIAL_AUTH_AZUREAD_TENANT_OAUTH2_KEY = os.getenv('MICROSOFT_GRAPH_CLIENT_ID')
+SOCIAL_AUTH_AZUREAD_TENANT_OAUTH2_SECRET = os.getenv('MICROSOFT_GRAPH_CLIENT_SECRET')
+SOCIAL_AUTH_AZUREAD_TENANT_OAUTH2_TENANT_ID = os.getenv('MICROSOFT_GRAPH_TENANT_ID')
+
+# OAuth Scopes - request only what's needed
+SOCIAL_AUTH_AZUREAD_TENANT_OAUTH2_SCOPE = [
+    'openid',
+    'email',
+    'profile',
+]
+
+# User creation and updates  
+SOCIAL_AUTH_AZUREAD_TENANT_OAUTH2_USER_FIELDS = ['username', 'email', 'first_name', 'last_name']
+
+# Security settings
+SOCIAL_AUTH_REDIRECT_IS_HTTPS = False  # Set to True in production
+SOCIAL_AUTH_JSONFIELD_ENABLED = True
+
+# Social Auth URLs
+SOCIAL_AUTH_URL_NAMESPACE = 'social'
+
+# Pipeline - customize user creation
+SOCIAL_AUTH_PIPELINE = (
+    'social_core.pipeline.social_auth.social_details',
+    'social_core.pipeline.social_auth.social_uid',
+    'social_core.pipeline.social_auth.auth_allowed',
+    'social_core.pipeline.social_auth.social_user',
+    'config.auth_pipeline.get_username',  # Custom: Generate username from email
+    'social_core.pipeline.user.create_user',
+    'social_core.pipeline.social_auth.associate_user',
+    'social_core.pipeline.social_auth.load_extra_data',
+    'social_core.pipeline.user.user_details',
+)
 
 # REST Framework Configuration
 REST_FRAMEWORK = {

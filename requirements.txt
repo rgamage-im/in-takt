@@ -65,6 +65,9 @@ mypy==1.13.0
 cryptography==43.0.3
 django-cors-headers==4.6.0
 
+# Authentication & SSO
+social-auth-app-django==5.6.0
+
 # WSGI/ASGI Server
 gunicorn==23.0.0
 whitenoise==6.8.2

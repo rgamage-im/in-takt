@@ -25,6 +25,12 @@ urlpatterns = [
     # Home page
     path("", core_views.home, name="home"),
     
+    # Auth
+    path("logout/", core_views.LogoutView.as_view(), name="logout"),
+    
+    # Social Auth (Azure AD SSO)
+    path("", include("social_django.urls", namespace="social")),
+    
     # Admin
     path("admin/", admin.site.urls),
     

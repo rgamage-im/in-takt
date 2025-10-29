@@ -47,8 +47,8 @@ class MyProfileAPIView(APIView):
             graph_service = GraphServiceDelegated()
             user_data = graph_service.get_my_profile(access_token)
             
-            serializer = UserProfileSerializer(data=user_data)
-            serializer.is_valid(raise_exception=True)
+            # For read-only serializers, pass data as instance not as data parameter
+            serializer = UserProfileSerializer(user_data)
             
             return Response(serializer.data, status=status.HTTP_200_OK)
             

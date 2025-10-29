@@ -1,0 +1,32 @@
+{% extends "rest_framework/base.html" %}
+{% load i18n %}
+
+{% block branding %}
+    <a class='navbar-brand' rel="nofollow" href='/'>
+        In-Takt
+    </a>
+{% endblock %}
+
+{% block userlinks %}
+    {% if user.is_authenticated %}
+        {% if user.first_name and user.last_name %}
+            <li class="navbar-text">{{ user.first_name }} {{ user.last_name }}</li>
+        {% elif user.email %}
+            <li class="navbar-text">{{ user.email }}</li>
+        {% else %}
+            <li class="navbar-text">{{ user.username }}</li>
+        {% endif %}
+        {% if user.is_staff %}
+            <li>
+                <a href="{% url 'admin:index' %}">{% trans 'Admin' %}</a>
+            </li>
+        {% endif %}
+        <li>
+            <a href="{% url 'logout' %}">{% trans 'Log out' %}</a>
+        </li>
+    {% else %}
+        <li>
+            <a href="{% url 'social:begin' 'azuread-tenant-oauth2' %}">{% trans 'Log in' %}</a>
+        </li>
+    {% endif %}
+{% endblock %}

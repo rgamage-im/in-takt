@@ -69,14 +69,23 @@
                 <div class="flex items-center">
                     {% if user.is_authenticated %}
                         <span class="text-sm" style="color: var(--color-light-sand);">
-                            Hello, {{ user.username }}
+                            {% if user.first_name and user.last_name %}
+                                Hello, {{ user.first_name }} {{ user.last_name }}
+                            {% elif user.email %}
+                                Hello, {{ user.email }}
+                            {% else %}
+                                Hello, {{ user.username }}
+                            {% endif %}
                         </span>
-                        <a href="/admin/logout/" class="ml-4 px-3 py-2 rounded-md text-sm font-medium text-white hover:bg-gray-700">
+                        <a href="{% url 'logout' %}" class="ml-4 px-3 py-2 rounded-md text-sm font-medium text-white hover:bg-gray-700">
                             Logout
                         </a>
                     {% else %}
-                        <a href="/admin/" class="px-3 py-2 rounded-md text-sm font-medium text-white hover:bg-gray-700">
-                            Login
+                        <a href="{% url 'social:begin' 'azuread-tenant-oauth2' %}" class="px-4 py-2 rounded-md text-sm font-medium text-white hover:opacity-90" style="background-color: var(--color-warm-brick);">
+                            <svg class="inline-block w-5 h-5 mr-2 -mt-1" fill="currentColor" viewBox="0 0 24 24">
+                                <path d="M11.5 0h1v11.5h11.5v1H12.5V24h-1V12.5H0v-1h11.5V0z"/>
+                            </svg>
+                            Sign in with Microsoft
                         </a>
                     {% endif %}
                 </div>

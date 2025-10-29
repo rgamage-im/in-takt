@@ -93,10 +93,10 @@ class GraphLogoutView(View):
         return redirect('home')
 
 
-@method_decorator(login_required, name='dispatch')
 class MyProfilePageView(View):
     """
     Display current user's Microsoft Graph profile (HTML page)
+    Does not require Django authentication - only MS Graph OAuth
     """
     
     def get(self, request):

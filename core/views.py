@@ -1,4 +1,6 @@
-from django.shortcuts import render
+from django.shortcuts import render, redirect
+from django.contrib.auth import logout
+from django.views import View
 
 
 def home(request):
@@ -21,3 +23,22 @@ def about(request):
         'title': 'About In-Takt',
     }
     return render(request, 'core/about.html', context)
+
+
+class LogoutView(View):
+    """
+    Handle user logout
+    """
+    def get(self, request):
+        """
+        Log out user and redirect to home
+        """
+        logout(request)
+        return redirect('home')
+    
+    def post(self, request):
+        """
+        Log out user and redirect to home
+        """
+        logout(request)
+        return redirect('home')

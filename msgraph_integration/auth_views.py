@@ -5,6 +5,8 @@ import secrets
 from django.shortcuts import redirect, render
 from django.http import JsonResponse, HttpResponse
 from django.views import View
+from django.contrib.auth.decorators import login_required
+from django.utils.decorators import method_decorator
 
 from .services_delegated import GraphServiceDelegated
 
@@ -91,6 +93,7 @@ class GraphLogoutView(View):
         return redirect('home')
 
 
+@method_decorator(login_required, name='dispatch')
 class MyProfilePageView(View):
     """
     Display current user's Microsoft Graph profile (HTML page)

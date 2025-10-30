@@ -27,6 +27,7 @@ azure-storage-blob==12.23.1
 
 # Database
 psycopg2-binary==2.9.10
+dj-database-url==2.2.0
 
 # Caching and Task Queue
 redis==5.2.0

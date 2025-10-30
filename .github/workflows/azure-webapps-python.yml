@@ -25,6 +25,8 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+          cache-dependency-path: 'requirements.txt'
 
       - name: Create and start virtual environment
         run: |
@@ -38,9 +40,7 @@ jobs:
         
       # Optional: Add step to run tests here (PyTest, Django test suites, etc.)
       
-      - name: Collect static files
-        run: |
-          python manage.py collectstatic --noinput
+      # Note: collectstatic is handled by Azure's Oryx during deployment
       
       - name: Upload artifact for deployment jobs
         uses: actions/upload-artifact@v4
@@ -49,6 +49,16 @@ jobs:
           path: |
             . 
             !venv/
+            !.git/
+            !.github/
+            !*.md
+            !docs/
+            !tests/
+            !*.pyc
+            !__pycache__/
+            !.gitignore
+            !.env*
+            !db.sqlite3
 
   deploy:
     permissions:

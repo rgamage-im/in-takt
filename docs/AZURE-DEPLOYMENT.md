@@ -3,7 +3,7 @@
 ## Overview
 This guide covers deploying the In-Takt Portal to Azure App Service with continuous deployment from GitHub.
 
-**Production URL:** https://in-tackt-portal-fph9efdudwd5gze6.westus2-01.azurewebsites.net/
+**Production URL:** https://in-takt-portal-ezgqh2c2a2dsdyfu.westus2-01.azurewebsites.net/
 
 ---
 
@@ -21,7 +21,7 @@ This guide covers deploying the In-Takt Portal to Azure App Service with continu
 
 ### 1.1 Navigate to App Service Configuration
 1. Go to [Azure Portal](https://portal.azure.com)
-2. Find your App Service: **in-tackt-portal**
+2. Find your App Service: **in-takt-portal**
 3. Click **Configuration** in the left menu
 4. Click **Application settings** tab
 
@@ -47,7 +47,7 @@ Value: False
 
 ```
 Name: DJANGO_ALLOWED_HOSTS
-Value: in-tackt-portal-fph9efdudwd5gze6.westus2-01.azurewebsites.net
+Value: in-takt-portal-ezgqh2c2a2dsdyfu.westus2-01.azurewebsites.net
 ```
 
 ```
@@ -81,7 +81,7 @@ Value: <your-tenant-id>
 
 ```
 Name: MICROSOFT_GRAPH_REDIRECT_URI
-Value: https://in-tackt-portal-fph9efdudwd5gze6.westus2-01.azurewebsites.net/graph/callback/
+Value: https://in-takt-portal-ezgqh2c2a2dsdyfu.westus2-01.azurewebsites.net/graph/callback/
 ```
 
 #### QuickBooks API
@@ -108,7 +108,7 @@ Value: sandbox
 
 ```
 Name: QUICKBOOKS_REDIRECT_URI
-Value: https://in-tackt-portal-fph9efdudwd5gze6.westus2-01.azurewebsites.net/quickbooks/callback/
+Value: https://in-takt-portal-ezgqh2c2a2dsdyfu.westus2-01.azurewebsites.net/quickbooks/callback/
 ```
 
 ### 1.3 Save Configuration
@@ -152,8 +152,8 @@ gunicorn config.wsgi:application --bind=0.0.0.0:8000 --workers=4 --timeout=600
 2. Under **Web** platform, click **Add URI**
 3. Add these two URIs:
    ```
-   https://in-tackt-portal-fph9efdudwd5gze6.westus2-01.azurewebsites.net/graph/callback/
-   https://in-tackt-portal-fph9efdudwd5gze6.westus2-01.azurewebsites.net/complete/azuread-tenant-oauth2/
+   https://in-takt-portal-ezgqh2c2a2dsdyfu.westus2-01.azurewebsites.net/graph/callback/
+   https://in-takt-portal-ezgqh2c2a2dsdyfu.westus2-01.azurewebsites.net/complete/azuread-tenant-oauth2/
    ```
 4. Click **Save**
 
@@ -218,7 +218,7 @@ python manage.py createsuperuser
 ## Step 6: Verify Deployment
 
 ### 6.1 Test Application
-Visit: https://in-tackt-portal-fph9efdudwd5gze6.westus2-01.azurewebsites.net/
+Visit: https://in-takt-portal-ezgqh2c2a2dsdyfu.westus2-01.azurewebsites.net/
 
 **Expected Results:**
 - ✅ Home page loads
@@ -227,12 +227,12 @@ Visit: https://in-tackt-portal-fph9efdudwd5gze6.westus2-01.azurewebsites.net/
 - ✅ After login, shows your name in top right
 
 ### 6.2 Test Admin Panel
-Visit: https://in-tackt-portal-fph9efdudwd5gze6.westus2-01.azurewebsites.net/admin/
+Visit: https://in-takt-portal-ezgqh2c2a2dsdyfu.westus2-01.azurewebsites.net/admin/
 
 Login with the superuser account you created.
 
 ### 6.3 Test API Documentation
-Visit: https://in-tackt-portal-fph9efdudwd5gze6.westus2-01.azurewebsites.net/api/docs/
+Visit: https://in-takt-portal-ezgqh2c2a2dsdyfu.westus2-01.azurewebsites.net/api/docs/
 
 Should show Swagger UI with API documentation.
 

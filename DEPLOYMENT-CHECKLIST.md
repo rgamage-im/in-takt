@@ -15,16 +15,16 @@ Add these environment variables:
 **Required:**
 - [ ] DJANGO_SECRET_KEY=`<generate-new>`
 - [ ] DJANGO_DEBUG=False
-- [ ] DJANGO_ALLOWED_HOSTS=in-tackt-portal-fph9efdudwd5gze6.westus2-01.azurewebsites.net
+- [ ] DJANGO_ALLOWED_HOSTS=in-takt-portal-ezgqh2c2a2dsdyfu.westus2-01.azurewebsites.net
 - [ ] MICROSOFT_GRAPH_CLIENT_ID=`<your-client-id>`
 - [ ] MICROSOFT_GRAPH_CLIENT_SECRET=`<your-client-secret>`
 - [ ] MICROSOFT_GRAPH_TENANT_ID=`<your-tenant-id>`
-- [ ] MICROSOFT_GRAPH_REDIRECT_URI=https://in-tackt-portal-fph9efdudwd5gze6.westus2-01.azurewebsites.net/graph/callback/
+- [ ] MICROSOFT_GRAPH_REDIRECT_URI=https://in-takt-portal-ezgqh2c2a2dsdyfu.westus2-01.azurewebsites.net/graph/callback/
 - [ ] QUICKBOOKS_CLIENT_ID=`<your-quickbooks-client-id>`
 - [ ] QUICKBOOKS_CLIENT_SECRET=`<your-quickbooks-client-secret>`
 - [ ] QUICKBOOKS_REALM_ID=`<your-realm-id>`
 - [ ] QUICKBOOKS_ENVIRONMENT=sandbox
-- [ ] QUICKBOOKS_REDIRECT_URI=https://in-tackt-portal-fph9efdudwd5gze6.westus2-01.azurewebsites.net/quickbooks/callback/
+- [ ] QUICKBOOKS_REDIRECT_URI=https://in-takt-portal-ezgqh2c2a2dsdyfu.westus2-01.azurewebsites.net/quickbooks/callback/
 
 **Optional:**
 - [ ] DATABASE_URL=`<postgresql-connection-string>` (if using PostgreSQL)
@@ -34,8 +34,8 @@ Add these environment variables:
 - [ ] Startup Command: `bash startup.sh`
 
 ## Azure AD App Registration
-- [ ] Add redirect URI: https://in-tackt-portal-fph9efdudwd5gze6.westus2-01.azurewebsites.net/graph/callback/
-- [ ] Add redirect URI: https://in-tackt-portal-fph9efdudwd5gze6.westus2-01.azurewebsites.net/complete/azuread-tenant-oauth2/
+- [ ] Add redirect URI: https://in-takt-portal-ezgqh2c2a2dsdyfu.westus2-01.azurewebsites.net/graph/callback/
+- [ ] Add redirect URI: https://in-takt-portal-ezgqh2c2a2dsdyfu.westus2-01.azurewebsites.net/complete/azuread-tenant-oauth2/
 
 ## Deploy
 - [ ] Commit changes to GitHub
@@ -60,7 +60,7 @@ python -c "from django.core.management.utils import get_random_secret_key; print
 ```
 
 ## Production URL
-https://in-tackt-portal-fph9efdudwd5gze6.westus2-01.azurewebsites.net/
+https://in-takt-portal-ezgqh2c2a2dsdyfu.westus2-01.azurewebsites.net/
 
 ## Documentation
 See: docs/AZURE-DEPLOYMENT.md for detailed instructions

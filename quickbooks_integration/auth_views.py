@@ -7,14 +7,18 @@ from django.shortcuts import redirect, render
 from django.http import JsonResponse
 from django.views import View
 from django.contrib import messages
+from django.contrib.auth.decorators import login_required
+from django.utils.decorators import method_decorator
 
 from .services import QuickBooksService
 
 
+@method_decorator(login_required, name='dispatch')
 class QuickBooksLoginView(View):
     """
     Initiate QuickBooks OAuth 2.0 flow
     Redirects user to QuickBooks authorization page
+    Requires Django authentication
     """
     
     def get(self, request):
@@ -29,10 +33,12 @@ class QuickBooksLoginView(View):
         return redirect(auth_url)
 
 
+@method_decorator(login_required, name='dispatch')
 class QuickBooksCallbackView(View):
     """
     Handle OAuth callback from QuickBooks
     Exchanges authorization code for access token
+    Requires Django authentication
     """
     
     def get(self, request):
@@ -85,9 +91,11 @@ class QuickBooksCallbackView(View):
             return redirect('home')
 
 
+@method_decorator(login_required, name='dispatch')
 class QuickBooksLogoutView(View):
     """
     Disconnect from QuickBooks and clear session
+    Requires Django authentication
     """
     
     def get(self, request):
@@ -112,9 +120,11 @@ class QuickBooksLogoutView(View):
         return redirect('home')
 
 
+@method_decorator(login_required, name='dispatch')
 class QuickBooksDashboardView(View):
     """
     Display QuickBooks data dashboard
+    Requires Django authentication + QuickBooks OAuth
     """
     
     def get(self, request):
@@ -178,9 +188,11 @@ class QuickBooksDashboardView(View):
             return render(request, 'quickbooks/dashboard.html', context)
 
 
+@method_decorator(login_required, name='dispatch')
 class QuickBooksCompanyInfoView(View):
     """
     Display company information
+    Requires Django authentication
     """
     
     def get(self, request):
@@ -198,9 +210,11 @@ class QuickBooksCompanyInfoView(View):
             return JsonResponse({'error': str(e)}, status=500)
 
 
+@method_decorator(login_required, name='dispatch')
 class QuickBooksInvoicesView(View):
     """
     Display invoices in a table view using Tabulator
+    Requires Django authentication
     """
     
     def get(self, request):
@@ -216,9 +230,11 @@ class QuickBooksInvoicesView(View):
         return render(request, 'quickbooks/invoices.html')
 
 
+@method_decorator(login_required, name='dispatch')
 class QuickBooksExpensesView(View):
     """
     Display expenses in a table view using Tabulator
+    Requires Django authentication
     """
     
     def get(self, request):

@@ -5,6 +5,7 @@ Uses tokens from authenticated user session
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
+from rest_framework.permissions import IsAuthenticated
 from drf_spectacular.utils import extend_schema
 
 from .services_delegated import GraphServiceDelegated
@@ -14,8 +15,9 @@ from .serializers import UserProfileSerializer
 class MyProfileAPIView(APIView):
     """
     Get current authenticated user's profile from Microsoft Graph
-    Requires: User must be logged in with Microsoft account
+    Requires: User must be logged in with Django and Microsoft account
     """
+    permission_classes = [IsAuthenticated]
     
     @extend_schema(
         summary="Get My Profile",
@@ -77,6 +79,7 @@ class MyMessagesAPIView(APIView):
     """
     Get current user's email messages
     """
+    permission_classes = [IsAuthenticated]
     
     @extend_schema(
         summary="Get My Messages",
@@ -114,6 +117,7 @@ class MyCalendarAPIView(APIView):
     """
     Get current user's calendar events
     """
+    permission_classes = [IsAuthenticated]
     
     @extend_schema(
         summary="Get My Calendar",

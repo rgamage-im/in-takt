@@ -5,7 +5,7 @@ REST API endpoints for QuickBooks data
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
-from rest_framework.permissions import AllowAny
+from rest_framework.permissions import IsAuthenticated
 from drf_spectacular.utils import extend_schema, OpenApiParameter
 from drf_spectacular.types import OpenApiTypes
 
@@ -16,7 +16,7 @@ class QuickBooksCustomersAPIView(APIView):
     """
     List customers from QuickBooks
     """
-    permission_classes = [AllowAny]  # Handle auth via session check
+    permission_classes = [IsAuthenticated]
     
     @extend_schema(
         summary="List QuickBooks Customers",
@@ -59,7 +59,7 @@ class QuickBooksInvoicesAPIView(APIView):
     """
     List invoices from QuickBooks
     """
-    permission_classes = [AllowAny]  # Handle auth via session check
+    permission_classes = [IsAuthenticated]
     
     @extend_schema(
         summary="List QuickBooks Invoices",
@@ -102,7 +102,7 @@ class QuickBooksVendorsAPIView(APIView):
     """
     List vendors from QuickBooks
     """
-    permission_classes = [AllowAny]  # Handle auth via session check
+    permission_classes = [IsAuthenticated]
     
     @extend_schema(
         summary="List QuickBooks Vendors",
@@ -145,7 +145,7 @@ class QuickBooksExpensesAPIView(APIView):
     """
     List expenses from QuickBooks
     """
-    permission_classes = [AllowAny]  # Handle auth via session check
+    permission_classes = [IsAuthenticated]
     
     @extend_schema(
         summary="List QuickBooks Expenses",
@@ -188,7 +188,7 @@ class QuickBooksAccountsAPIView(APIView):
     """
     List chart of accounts from QuickBooks
     """
-    permission_classes = [AllowAny]  # Handle auth via session check
+    permission_classes = [IsAuthenticated]
     
     @extend_schema(
         summary="List QuickBooks Accounts",
@@ -231,7 +231,7 @@ class QuickBooksProfitLossAPIView(APIView):
     """
     Get Profit and Loss report
     """
-    permission_classes = [AllowAny]  # Handle auth via session check
+    permission_classes = [IsAuthenticated]
     
     @extend_schema(
         summary="Get Profit and Loss Report",
@@ -287,7 +287,7 @@ class QuickBooksBalanceSheetAPIView(APIView):
     """
     Get Balance Sheet report
     """
-    permission_classes = [AllowAny]  # Handle auth via session check
+    permission_classes = [IsAuthenticated]
     
     @extend_schema(
         summary="Get Balance Sheet Report",

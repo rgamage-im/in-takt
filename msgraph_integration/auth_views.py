@@ -93,10 +93,11 @@ class GraphLogoutView(View):
         return redirect('home')
 
 
+@method_decorator(login_required, name='dispatch')
 class MyProfilePageView(View):
     """
     Display current user's Microsoft Graph profile (HTML page)
-    Does not require Django authentication - only MS Graph OAuth
+    Requires Django authentication + MS Graph OAuth
     """
     
     def get(self, request):
@@ -122,10 +123,11 @@ class MyProfilePageView(View):
         return render(request, 'msgraph/profile.html', context)
 
 
+@method_decorator(login_required, name='dispatch')
 class GraphExploreView(View):
     """
     Entry point for exploring Microsoft 365 data.
-    Automatically handles authentication if needed.
+    Requires Django authentication, then handles MS Graph OAuth if needed.
     """
     
     def get(self, request):

@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
 
 env:
-  AZURE_WEBAPP_NAME: in-takt-portal-ezgqh2c2a2dsdyfu
+  AZURE_WEBAPP_NAME: in-takt-portal
   PYTHON_VERSION: '3.12'
 
 permissions:

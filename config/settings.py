@@ -35,6 +35,9 @@ ALLOWED_HOSTS = os.getenv('DJANGO_ALLOWED_HOSTS', 'localhost,127.0.0.1').split('
 if website_hostname := os.getenv('WEBSITE_HOSTNAME'):
     ALLOWED_HOSTS.append(website_hostname)
 
+# Allow Azure's internal health check IPs (169.254.x.x range)
+ALLOWED_HOSTS.extend(['169.254.129.4', '169.254.129.1'])
+
 
 # Application definition
 
@@ -166,7 +169,7 @@ STORAGES = {
         "BACKEND": "django.core.files.storage.FileSystemStorage",
     },
     "staticfiles": {
-        "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
+        "BACKEND": "whitenoise.storage.CompressedStaticFilesStorage",
     },
 }
 

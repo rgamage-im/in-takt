@@ -2,9 +2,14 @@
 Microsoft Graph Integration URLs
 """
 from django.urls import path
-from .views import UserProfileView, UserListView, UserSearchView
 from .auth_views import GraphLoginView, GraphCallbackView, GraphLogoutView, MyProfilePageView, GraphExploreView
-from .api_views import MyProfileAPIView, MyMessagesAPIView, MyCalendarAPIView
+from .api_views import (
+    MyProfileAPIView, 
+    MyMessagesAPIView, 
+    MyCalendarAPIView,
+    MyTeamsAPIView,
+    MyTeamsChannelMessagesAPIView
+)
 
 app_name = 'msgraph'
 
@@ -24,10 +29,6 @@ urlpatterns = [
     path('api/me/', MyProfileAPIView.as_view(), name='api-my-profile'),
     path('api/me/messages/', MyMessagesAPIView.as_view(), name='api-my-messages'),
     path('api/me/calendar/', MyCalendarAPIView.as_view(), name='api-my-calendar'),
-    
-    # Legacy API Routes - Client Credentials (kept for reference)
-    path('users/', UserListView.as_view(), name='user-list'),
-    path('users/search/', UserSearchView.as_view(), name='user-search'),
-    path('users/<str:user_id>/', UserProfileView.as_view(), name='user-profile'),
-    path('me/', UserProfileView.as_view(), {'user_id': 'me'}, name='my-profile'),
+    path('api/me/teams/', MyTeamsAPIView.as_view(), name='api-my-teams'),
+    path('api/me/teams/messages/', MyTeamsChannelMessagesAPIView.as_view(), name='api-my-teams-messages'),
 ]

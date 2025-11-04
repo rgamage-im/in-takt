@@ -149,3 +149,81 @@ class MyCalendarAPIView(APIView):
                 {'error': str(e)},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
+
+
+class MyTeamsAPIView(APIView):
+    """
+    Get current user's Teams
+    """
+    permission_classes = [IsAuthenticated]
+    
+    @extend_schema(
+        summary="Get My Teams",
+        description="Retrieve the teams the authenticated user is a member of",
+        responses={200: dict},
+        tags=['Microsoft Graph - Delegated']
+    )
+    def get(self, request):
+        """
+        Get current user's joined teams
+        """
+        access_token = request.session.get('graph_access_token')
+        
+        if not access_token:
+            return Response(
+                {'error': 'Not authenticated with Microsoft', 'login_url': '/graph/login/'},
+                status=status.HTTP_401_UNAUTHORIZED
+            )
+        
+        try:
+            graph_service = GraphServiceDelegated()
+            teams_data = graph_service.get_my_joined_teams(access_token)
+            
+            return Response(teams_data, status=status.HTTP_200_OK)
+            
+        except Exception as e:
+            return Response(
+                {'error': str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+
+class MyTeamsChannelMessagesAPIView(APIView):
+    """
+    Get channel messages from all user's teams
+    """
+    permission_classes = [IsAuthenticated]
+    
+    @extend_schema(
+        summary="Get My Channel Messages",
+        description="Retrieve recent channel messages from all teams the user is a member of",
+        responses={200: dict},
+        tags=['Microsoft Graph - Delegated']
+    )
+    def get(self, request):
+        """
+        Get channel messages from all teams
+        """
+        access_token = request.session.get('graph_access_token')
+        
+        if not access_token:
+            return Response(
+                {'error': 'Not authenticated with Microsoft', 'login_url': '/graph/login/'},
+                status=status.HTTP_401_UNAUTHORIZED
+            )
+        
+        try:
+            max_per_channel = int(request.query_params.get('max_per_channel', 10))
+            graph_service = GraphServiceDelegated()
+            messages_data = graph_service.get_all_my_channel_messages(
+                access_token, 
+                max_messages_per_channel=max_per_channel
+            )
+            
+            return Response(messages_data, status=status.HTTP_200_OK)
+            
+        except Exception as e:
+            return Response(
+                {'error': str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )

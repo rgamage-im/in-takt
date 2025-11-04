@@ -27,6 +27,8 @@ class GraphServiceDelegated:
             "User.ReadBasic.All",
             "Calendars.Read",
             "Mail.Read",
+            "ChannelMessage.Read.All",
+            "Team.ReadBasic.All",
         ]
         
         self.graph_endpoint = "https://graph.microsoft.com/v1.0"
@@ -200,3 +202,109 @@ class GraphServiceDelegated:
         """
         endpoint = f"/users?$filter=startswith(displayName,'{query}') or startswith(mail,'{query}')&$top={top}"
         return self._make_request(endpoint, access_token)
+    
+    def get_my_joined_teams(self, access_token: str) -> Dict[str, Any]:
+        """
+        Get teams the current user is a member of
+        
+        Args:
+            access_token: User's access token
+            
+        Returns:
+            List of teams
+        """
+        endpoint = "/me/joinedTeams"
+        return self._make_request(endpoint, access_token)
+    
+    def get_team_channels(self, access_token: str, team_id: str) -> Dict[str, Any]:
+        """
+        Get channels for a specific team
+        
+        Args:
+            access_token: User's access token
+            team_id: Team ID
+            
+        Returns:
+            List of channels
+        """
+        endpoint = f"/teams/{team_id}/channels"
+        return self._make_request(endpoint, access_token)
+    
+    def get_channel_messages(self, access_token: str, team_id: str, channel_id: str, top: int = 50) -> Dict[str, Any]:
+        """
+        Get messages from a specific channel
+        
+        Args:
+            access_token: User's access token
+            team_id: Team ID
+            channel_id: Channel ID
+            top: Number of messages to return
+            
+        Returns:
+            List of channel messages
+        """
+        endpoint = f"/teams/{team_id}/channels/{channel_id}/messages?$top={top}"
+        return self._make_request(endpoint, access_token)
+    
+    def get_all_my_channel_messages(self, access_token: str, max_messages_per_channel: int = 10) -> Dict[str, Any]:
+        """
+        Get recent messages from all channels the user has access to
+        
+        Args:
+            access_token: User's access token
+            max_messages_per_channel: Maximum messages to fetch per channel
+            
+        Returns:
+            Dictionary with teams, channels, and messages
+        """
+        result = {
+            'teams': [],
+            'total_messages': 0
+        }
+        
+        # Get all teams user is member of
+        teams_response = self.get_my_joined_teams(access_token)
+        teams = teams_response.get('value', [])
+        
+        for team in teams:
+            team_id = team.get('id')
+            team_data = {
+                'id': team_id,
+                'displayName': team.get('displayName'),
+                'channels': []
+            }
+            
+            # Get channels for this team
+            try:
+                channels_response = self.get_team_channels(access_token, team_id)
+                channels = channels_response.get('value', [])
+                
+                for channel in channels:
+                    channel_id = channel.get('id')
+                    channel_data = {
+                        'id': channel_id,
+                        'displayName': channel.get('displayName'),
+                        'messages': []
+                    }
+                    
+                    # Get messages from this channel
+                    try:
+                        messages_response = self.get_channel_messages(
+                            access_token, 
+                            team_id, 
+                            channel_id, 
+                            top=max_messages_per_channel
+                        )
+                        messages = messages_response.get('value', [])
+                        channel_data['messages'] = messages
+                        result['total_messages'] += len(messages)
+                    except Exception as e:
+                        channel_data['error'] = str(e)
+                    
+                    team_data['channels'].append(channel_data)
+            except Exception as e:
+                team_data['error'] = str(e)
+            
+            result['teams'].append(team_data)
+        
+        return result

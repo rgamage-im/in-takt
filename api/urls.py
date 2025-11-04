@@ -24,13 +24,4 @@ urlpatterns = [
     
     # Router URLs (for ViewSets)
     path('', include(router.urls)),
-    
-    # API v1 endpoints
-    path('v1/', include([
-        # Microsoft Graph endpoints
-        path('graph/', include('msgraph_integration.urls')),
-        
-        # QuickBooks endpoints (to be added)
-        # path('quickbooks/', include('quickbooks_integration.urls')),
-    ])),
 ]

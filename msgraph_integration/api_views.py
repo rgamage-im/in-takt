@@ -220,6 +220,31 @@ class MyTeamsChannelMessagesAPIView(APIView):
                 max_messages_per_channel=max_per_channel
             )
             
+            # Filter out system event messages, deleted messages, and bot messages
+            if messages_data.get('teams'):
+                for team in messages_data['teams']:
+                    if team.get('channels'):
+                        for channel in team['channels']:
+                            if channel.get('messages'):
+                                # Filter out unwanted messages:
+                                # - System event messages (content is '<systemEventMessage/>')
+                                # - Deleted messages (deletedDateTime is not None)
+                                # - Bot messages (from.user is None)
+                                channel['messages'] = [
+                                    msg for msg in channel['messages']
+                                    if msg.get('body', {}).get('content') != '<systemEventMessage/>'
+                                    and msg.get('deletedDateTime') is None
+                                    and msg.get('from', {}).get('user') is not None
+                                ]
+                
+                # Recalculate total_messages after filtering
+                total = 0
+                for team in messages_data['teams']:
+                    if team.get('channels'):
+                        for channel in team['channels']:
+                            total += len(channel.get('messages', []))
+                messages_data['total_messages'] = total
+            
             return Response(messages_data, status=status.HTTP_200_OK)
             
         except Exception as e:

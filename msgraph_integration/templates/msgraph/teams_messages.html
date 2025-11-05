@@ -253,6 +253,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         team.channels.forEach(function(channel) {
                             if (channel.messages && Array.isArray(channel.messages)) {
                                 channel.messages.forEach(function(message) {
+                                    // Add the main message
                                     messages.push({
                                         id: message.id,
                                         teamName: team.displayName,
@@ -266,6 +267,25 @@ document.addEventListener('DOMContentLoaded', function() {
                                         importance: message.importance,
                                         messageType: message.messageType
                                     });
+                                    
+                                    // Also add any replies (threaded messages)
+                                    if (message.replies && Array.isArray(message.replies)) {
+                                        message.replies.forEach(function(reply) {
+                                            messages.push({
+                                                id: reply.id,
+                                                teamName: team.displayName,
+                                                channelName: channel.displayName,
+                                                createdDateTime: reply.createdDateTime,
+                                                subject: reply.subject || '↳ Re: ' + (message.subject || '(thread reply)'),
+                                                bodyContent: reply.body?.content || '',
+                                                fromDisplayName: reply.from?.user?.displayName || 'Unknown',
+                                                fromEmail: reply.from?.user?.userPrincipalName || '',
+                                                attachments: reply.attachments || [],
+                                                importance: reply.importance,
+                                                messageType: reply.messageType
+                                            });
+                                        });
+                                    }
                                 });
                             }
                         });
@@ -364,6 +384,17 @@ document.addEventListener('DOMContentLoaded', function() {
                     return rowValue.some(function(att) {
                         return (att.name || '').toLowerCase().includes(headerValue.toLowerCase());
                     });
+                }
+            },
+            {
+                title: "Message ID",
+                field: "id",
+                sorter: "string",
+                width: 250,
+                headerFilter: "input",
+                formatter: function(cell, formatterParams, onRendered){
+                    var value = cell.getValue();
+                    return '<span style="font-family: monospace; font-size: 11px;">' + (value || '') + '</span>';
                 }
             }
         ],

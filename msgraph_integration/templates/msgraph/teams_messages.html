@@ -233,11 +233,13 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Initialize the table
     var table = new Tabulator("#messages-table", {
-        ajaxURL: "/graph/api/me/teams/messages/?max_per_channel=50",
+        ajaxURL: "/graph/api/me/teams/messages/?max_per_channel=50&_t=" + Date.now(),
         ajaxConfig: {
             credentials: "same-origin",
             headers: {
                 "X-Requested-With": "XMLHttpRequest",
+                "Cache-Control": "no-cache, no-store, must-revalidate",
+                "Pragma": "no-cache"
             }
         },
         ajaxResponse: function(url, params, response){

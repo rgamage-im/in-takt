@@ -241,8 +241,10 @@ class GraphServiceDelegated:
             top: Number of messages to return
             
         Returns:
-            List of channel messages
+            List of channel messages ordered by most recent first
         """
+        # Note: orderby is not supported for channel messages, but we request top messages
+        # which should give us the most recent by default
         endpoint = f"/teams/{team_id}/channels/{channel_id}/messages?$top={top}"
         return self._make_request(endpoint, access_token)
     

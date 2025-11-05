@@ -245,7 +245,12 @@ class MyTeamsChannelMessagesAPIView(APIView):
                             total += len(channel.get('messages', []))
                 messages_data['total_messages'] = total
             
-            return Response(messages_data, status=status.HTTP_200_OK)
+            # Create response with cache-control headers to prevent caching
+            response = Response(messages_data, status=status.HTTP_200_OK)
+            response['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+            response['Pragma'] = 'no-cache'
+            response['Expires'] = '0'
+            return response
             
         except Exception as e:
             return Response(

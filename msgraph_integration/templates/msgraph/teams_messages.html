@@ -1,0 +1,450 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Teams Messages - In-Takt{% endblock %}
+
+{% block extra_css %}
+<!-- Tabulator CSS -->
+<link href="https://unpkg.com/tabulator-tables@6.2.5/dist/css/tabulator.min.css" rel="stylesheet">
+<!-- Luxon for date handling -->
+<script src="https://cdn.jsdelivr.net/npm/luxon@3.4.4/build/global/luxon.min.js"></script>
+<style>
+    /* Tabulator theme customization */
+    .tabulator {
+        font-size: 14px;
+        border: 1px solid #dee2e6;
+    }
+    
+    .tabulator-header {
+        background-color: var(--color-deep-navy) !important;
+        color: white !important;
+        border: none;
+    }
+    
+    .tabulator-header .tabulator-col {
+        background-color: var(--color-deep-navy) !important;
+        border-right: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    
+    .tabulator-header .tabulator-col-title {
+        color: white !important;
+    }
+    
+    /* Header filter input styling */
+    .tabulator-header-filter input {
+        color: #1A2A3A !important;
+        background-color: white !important;
+        border: 1px solid #cbd5e0 !important;
+        padding: 4px 8px !important;
+    }
+    
+    .tabulator-header-filter input::placeholder {
+        color: #a0aec0 !important;
+    }
+    
+    .tabulator-row:hover {
+        background-color: rgba(123, 182, 224, 0.1) !important;
+    }
+    
+    .tabulator-row.tabulator-selected {
+        background-color: rgba(193, 78, 50, 0.1) !important;
+    }
+    
+    .tabulator .tabulator-footer {
+        background-color: var(--color-light-sand);
+        border-top: 2px solid var(--color-deep-navy);
+    }
+    
+    /* Loading overlay */
+    #loading-overlay {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(255, 255, 255, 0.9);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 1000;
+    }
+    
+    .spinner {
+        border: 4px solid var(--color-light-sand);
+        border-top: 4px solid var(--color-warm-brick);
+        border-radius: 50%;
+        width: 40px;
+        height: 40px;
+        animation: spin 1s linear infinite;
+    }
+    
+    @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+    
+    /* Custom styling for message content */
+    .message-content {
+        max-height: 60px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+    }
+    
+    .attachment-link {
+        display: inline-block;
+        padding: 2px 6px;
+        margin: 2px;
+        background-color: var(--color-soft-sky-blue);
+        color: white;
+        border-radius: 4px;
+        text-decoration: none;
+        font-size: 12px;
+    }
+    
+    .attachment-link:hover {
+        background-color: var(--color-warm-brick);
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="px-4 py-6 sm:px-0">
+    <!-- Header -->
+    <div class="mb-6">
+        <div class="flex items-center justify-between">
+            <div>
+                <h1 class="text-3xl font-bold" style="color: var(--color-deep-navy);">
+                    Teams Channel Messages
+                </h1>
+                <p class="mt-2 text-sm" style="color: var(--color-olive-gray);">
+                    View and search all channel messages from your Microsoft Teams
+                </p>
+            </div>
+            <div class="flex gap-3">
+                <a href="/graph/profile/" class="px-4 py-2 rounded-md text-white font-medium hover:opacity-90 transition-opacity" style="background-color: var(--color-warm-brick);">
+                    ← Back to Profile
+                </a>
+                <a href="/graph/api/me/teams/messages/" class="px-4 py-2 rounded-md text-white font-medium hover:opacity-90 transition-opacity" style="background-color: var(--color-olive-gray);">
+                    View Raw API
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Stats Cards -->
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+        <div class="bg-white rounded-lg shadow p-4 border-l-4" style="border-left-color: var(--color-warm-brick);">
+            <div class="text-sm font-medium" style="color: var(--color-olive-gray);">Total Messages</div>
+            <div id="stat-total" class="text-2xl font-bold mt-1" style="color: var(--color-deep-navy);">-</div>
+        </div>
+        <div class="bg-white rounded-lg shadow p-4 border-l-4" style="border-left-color: var(--color-soft-sky-blue);">
+            <div class="text-sm font-medium" style="color: var(--color-olive-gray);">Teams</div>
+            <div id="stat-teams" class="text-2xl font-bold mt-1" style="color: var(--color-deep-navy);">-</div>
+        </div>
+        <div class="bg-white rounded-lg shadow p-4 border-l-4" style="border-left-color: var(--color-olive-gray);">
+            <div class="text-sm font-medium" style="color: var(--color-olive-gray);">Channels</div>
+            <div id="stat-channels" class="text-2xl font-bold mt-1" style="color: var(--color-deep-navy);">-</div>
+        </div>
+        <div class="bg-white rounded-lg shadow p-4 border-l-4" style="border-left-color: #48BB78;">
+            <div class="text-sm font-medium" style="color: var(--color-olive-gray);">With Attachments</div>
+            <div id="stat-attachments" class="text-2xl font-bold mt-1" style="color: var(--color-deep-navy);">-</div>
+        </div>
+    </div>
+
+    <!-- Table Container -->
+    <div class="bg-white rounded-lg shadow-lg p-6" style="position: relative; min-height: 500px;">
+        <div id="loading-overlay">
+            <div class="spinner"></div>
+        </div>
+        
+        <div class="mb-4">
+            <h2 class="text-lg font-semibold mb-2" style="color: var(--color-deep-navy);">Messages List</h2>
+            <p class="text-sm" style="color: var(--color-olive-gray);">
+                Click column headers to sort • Use search filters to find specific messages • Click rows for details
+            </p>
+        </div>
+        
+        <div id="messages-table"></div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<!-- Tabulator JS -->
+<script type="text/javascript" src="https://unpkg.com/tabulator-tables@6.2.5/dist/js/tabulator.min.js"></script>
+
+<script>
+// Initialize Tabulator when page loads
+document.addEventListener('DOMContentLoaded', function() {
+    
+    // Date/time formatter
+    var dateTimeFormatter = function(cell, formatterParams, onRendered){
+        var value = cell.getValue();
+        if (!value) return "-";
+        var date = new Date(value);
+        return date.toLocaleString('en-US', {
+            year: 'numeric', 
+            month: 'short', 
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+        });
+    };
+    
+    // Truncated text formatter
+    var truncatedTextFormatter = function(cell, formatterParams, onRendered){
+        var value = cell.getValue();
+        if (!value) return "-";
+        
+        // Strip HTML tags for display
+        var tempDiv = document.createElement("div");
+        tempDiv.innerHTML = value;
+        var text = tempDiv.textContent || tempDiv.innerText || "";
+        
+        // Truncate to 100 characters
+        if (text.length > 100) {
+            return '<div class="message-content" title="' + text.replace(/"/g, '&quot;') + '">' + 
+                   text.substring(0, 100) + '...' + 
+                   '</div>';
+        }
+        return '<div class="message-content">' + text + '</div>';
+    };
+    
+    // Attachments formatter
+    var attachmentsFormatter = function(cell, formatterParams, onRendered){
+        var attachments = cell.getValue();
+        if (!attachments || attachments.length === 0) return "-";
+        
+        var html = '';
+        attachments.forEach(function(att) {
+            if (att.contentUrl) {
+                html += '<a href="' + att.contentUrl + '" target="_blank" class="attachment-link">' + 
+                        (att.name || 'Attachment') + '</a> ';
+            } else {
+                html += '<span class="attachment-link" style="background-color: #cbd5e0; color: #000;">' + 
+                        (att.name || 'Attachment') + '</span> ';
+            }
+        });
+        return html;
+    };
+    
+    // Initialize the table
+    var table = new Tabulator("#messages-table", {
+        ajaxURL: "/graph/api/me/teams/messages/?max_per_channel=50",
+        ajaxConfig: {
+            credentials: "same-origin",
+            headers: {
+                "X-Requested-With": "XMLHttpRequest",
+            }
+        },
+        ajaxResponse: function(url, params, response){
+            // Hide loading overlay when data arrives
+            document.getElementById('loading-overlay').style.display = 'none';
+            
+            // Transform nested data structure into flat array for table
+            let messages = [];
+            
+            if (response.teams && Array.isArray(response.teams)) {
+                response.teams.forEach(function(team) {
+                    if (team.channels && Array.isArray(team.channels)) {
+                        team.channels.forEach(function(channel) {
+                            if (channel.messages && Array.isArray(channel.messages)) {
+                                channel.messages.forEach(function(message) {
+                                    messages.push({
+                                        id: message.id,
+                                        teamName: team.displayName,
+                                        channelName: channel.displayName,
+                                        createdDateTime: message.createdDateTime,
+                                        subject: message.subject,
+                                        bodyContent: message.body?.content || '',
+                                        fromDisplayName: message.from?.user?.displayName || 'Unknown',
+                                        fromEmail: message.from?.user?.userPrincipalName || '',
+                                        attachments: message.attachments || [],
+                                        importance: message.importance,
+                                        messageType: message.messageType
+                                    });
+                                });
+                            }
+                        });
+                    }
+                });
+            }
+            
+            // Update stats
+            updateStats(response);
+            
+            // Return the flat messages array
+            return messages;
+        },
+        layout: "fitDataFill",
+        pagination: true,
+        paginationSize: 25,
+        paginationSizeSelector: [10, 25, 50, 100],
+        movableColumns: true,
+        resizableColumns: true,
+        initialSort: [
+            {column: "createdDateTime", dir: "desc"}
+        ],
+        columns: [
+            {
+                title: "Team", 
+                field: "teamName",
+                sorter: "string",
+                width: 150,
+                headerFilter: "input"
+            },
+            {
+                title: "Channel", 
+                field: "channelName",
+                sorter: "string",
+                width: 150,
+                headerFilter: "input"
+            },
+            {
+                title: "Date/Time", 
+                field: "createdDateTime",
+                sorter: function(a, b, aRow, bRow, column, dir, sorterParams){
+                    var aDate = a ? new Date(a).getTime() : 0;
+                    var bDate = b ? new Date(b).getTime() : 0;
+                    return aDate - bDate;
+                },
+                formatter: dateTimeFormatter,
+                width: 160,
+                headerFilter: "input"
+            },
+            {
+                title: "From", 
+                field: "fromDisplayName",
+                sorter: "string",
+                width: 150,
+                headerFilter: "input"
+            },
+            {
+                title: "Subject",
+                field: "subject",
+                sorter: "string",
+                width: 200,
+                headerFilter: "input",
+                formatter: function(cell, formatterParams, onRendered){
+                    var value = cell.getValue();
+                    return value || "(No subject)";
+                }
+            },
+            {
+                title: "Message", 
+                field: "bodyContent",
+                sorter: "string",
+                formatter: truncatedTextFormatter,
+                minWidth: 250,
+                headerFilter: "input",
+                headerFilterFunc: function(headerValue, rowValue, rowData, filterParams){
+                    // Strip HTML for filtering
+                    var tempDiv = document.createElement("div");
+                    tempDiv.innerHTML = rowValue || "";
+                    var text = tempDiv.textContent || tempDiv.innerText || "";
+                    return text.toLowerCase().includes(headerValue.toLowerCase());
+                }
+            },
+            {
+                title: "Attachments",
+                field: "attachments",
+                formatter: attachmentsFormatter,
+                width: 200,
+                sorter: function(a, b, aRow, bRow, column, dir, sorterParams){
+                    var aLen = a ? a.length : 0;
+                    var bLen = b ? b.length : 0;
+                    return aLen - bLen;
+                },
+                headerFilterFunc: function(headerValue, rowValue, rowData, filterParams){
+                    if (!headerValue) return true;
+                    if (!rowValue || rowValue.length === 0) return false;
+                    return rowValue.some(function(att) {
+                        return (att.name || '').toLowerCase().includes(headerValue.toLowerCase());
+                    });
+                }
+            }
+        ],
+        rowClick: function(e, row){
+            // Handle row click - show message details
+            var data = row.getData();
+            
+            // Create message body without HTML tags for alert
+            var tempDiv = document.createElement("div");
+            tempDiv.innerHTML = data.bodyContent;
+            var messageText = tempDiv.textContent || tempDiv.innerText || "";
+            
+            var attachmentInfo = "";
+            if (data.attachments && data.attachments.length > 0) {
+                attachmentInfo = "\n\nAttachments:\n" + 
+                    data.attachments.map(function(att) { 
+                        return "- " + (att.name || 'Unnamed'); 
+                    }).join("\n");
+            }
+            
+            alert(
+                "Team: " + data.teamName + "\n" +
+                "Channel: " + data.channelName + "\n" +
+                "From: " + data.fromDisplayName + "\n" +
+                "Date: " + new Date(data.createdDateTime).toLocaleString() + "\n" +
+                "Subject: " + (data.subject || "(No subject)") + "\n\n" +
+                "Message:\n" + messageText +
+                attachmentInfo
+            );
+        }
+    });
+    
+    // Update statistics
+    function updateStats(response) {
+        if (!response || !response.teams) return;
+        
+        // Total messages
+        var totalMessages = response.total_messages || 0;
+        document.getElementById('stat-total').textContent = totalMessages;
+        
+        // Total teams
+        var totalTeams = response.teams.length;
+        document.getElementById('stat-teams').textContent = totalTeams;
+        
+        // Total channels
+        var totalChannels = 0;
+        response.teams.forEach(function(team) {
+            if (team.channels) {
+                totalChannels += team.channels.length;
+            }
+        });
+        document.getElementById('stat-channels').textContent = totalChannels;
+        
+        // Messages with attachments
+        var withAttachments = 0;
+        response.teams.forEach(function(team) {
+            if (team.channels) {
+                team.channels.forEach(function(channel) {
+                    if (channel.messages) {
+                        channel.messages.forEach(function(message) {
+                            if (message.attachments && message.attachments.length > 0) {
+                                withAttachments++;
+                            }
+                        });
+                    }
+                });
+            }
+        });
+        document.getElementById('stat-attachments').textContent = withAttachments;
+    }
+    
+    // Download buttons (optional - uncomment to add export functionality)
+    /*
+    document.getElementById('download-csv')?.addEventListener('click', function(){
+        table.download("csv", "teams_messages.csv");
+    });
+    
+    document.getElementById('download-xlsx')?.addEventListener('click', function(){
+        table.download("xlsx", "teams_messages.xlsx", {sheetName:"Teams Messages"});
+    });
+    */
+});
+</script>
+{% endblock %}

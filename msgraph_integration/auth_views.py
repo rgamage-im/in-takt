@@ -147,3 +147,26 @@ class GraphExploreView(View):
             request.session['graph_next'] = 'msgraph:my-profile-page'
             return redirect('msgraph:graph-login')
 
+
+@method_decorator(login_required, name='dispatch')
+class TeamsMessagesTableView(View):
+    """
+    Display Teams channel messages in a table view using Tabulator
+    Requires Django authentication + MS Graph OAuth
+    """
+    
+    def get(self, request):
+        """
+        Show Teams messages table page
+        """
+        # Check if user is authenticated with Microsoft Graph
+        access_token = request.session.get('graph_access_token')
+        
+        if not access_token:
+            # Store intended destination and redirect to login
+            request.session['graph_next'] = 'msgraph:teams-messages-table'
+            return redirect('msgraph:graph-login')
+        
+        # Render the template - Tabulator will fetch data via AJAX
+        return render(request, 'msgraph/teams_messages.html')
+

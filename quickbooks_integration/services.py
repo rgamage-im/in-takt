@@ -357,3 +357,160 @@ class QuickBooksService:
             f'company/{realm_id}/reports/BalanceSheet',
             params=params
         )
+    
+    # Attachments / Receipts
+    def upload_receipt(
+        self,
+        access_token: str,
+        realm_id: str,
+        file_content: bytes,
+        file_name: str,
+        content_type: str = 'image/jpeg'
+    ) -> Dict[str, Any]:
+        """
+        Upload a receipt file to QuickBooks
+        
+        Args:
+            access_token: OAuth access token
+            realm_id: QuickBooks company ID
+            file_content: Binary file content
+            file_name: Name of the file (e.g., 'receipt.jpg')
+            content_type: MIME type (e.g., 'image/jpeg', 'application/pdf')
+            
+        Returns:
+            Attachable object with ID to link to transactions
+        """
+        url = f"{self.api_base_url}/company/{realm_id}/upload"
+        
+        headers = {
+            'Authorization': f'Bearer {access_token}',
+            'Accept': 'application/json',
+        }
+        
+        # Prepare multipart form data
+        files = {
+            'file_content_01': (file_name, file_content, content_type)
+        }
+        
+        # Include metadata as a separate form field
+        data = {
+            'file_metadata_01': f'{{"FileName":"{file_name}","ContentType":"{content_type}"}}'
+        }
+        
+        response = requests.post(url, headers=headers, files=files, data=data)
+        response.raise_for_status()
+        
+        return response.json()
+    
+    def attach_receipt_to_transaction(
+        self,
+        access_token: str,
+        realm_id: str,
+        attachable_id: str,
+        transaction_type: str,
+        transaction_id: str,
+        note: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """
+        Attach an uploaded receipt to a transaction
+        
+        Args:
+            access_token: OAuth access token
+            realm_id: QuickBooks company ID
+            attachable_id: ID from upload_receipt response
+            transaction_type: Type of transaction ('Purchase', 'Bill', 'Invoice', etc.)
+            transaction_id: ID of the transaction
+            note: Optional note about the attachment
+            
+        Returns:
+            Updated attachable object
+        """
+        url = f"{self.api_base_url}/company/{realm_id}/attachable/{attachable_id}"
+        
+        headers = {
+            'Authorization': f'Bearer {access_token}',
+            'Accept': 'application/json',
+            'Content-Type': 'application/json',
+        }
+        
+        # Get the current attachable first to update it
+        get_response = requests.get(url, headers=headers)
+        get_response.raise_for_status()
+        attachable = get_response.json().get('Attachable', {})
+        
+        # Add the entity reference
+        if 'AttachableRef' not in attachable:
+            attachable['AttachableRef'] = []
+        
+        attachable['AttachableRef'].append({
+            'EntityRef': {
+                'type': transaction_type,
+                'value': transaction_id
+            }
+        })
+        
+        if note:
+            attachable['Note'] = note
+        
+        # Update the attachable
+        update_data = {
+            'Attachable': attachable
+        }
+        
+        response = requests.post(url, headers=headers, json=update_data)
+        response.raise_for_status()
+        
+        return response.json()
+    
+    def upload_and_attach_receipt(
+        self,
+        access_token: str,
+        realm_id: str,
+        file_content: bytes,
+        file_name: str,
+        transaction_type: str,
+        transaction_id: str,
+        content_type: str = 'image/jpeg',
+        note: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """
+        Convenience method to upload and attach a receipt in one call
+        
+        Args:
+            access_token: OAuth access token
+            realm_id: QuickBooks company ID
+            file_content: Binary file content
+            file_name: Name of the file
+            transaction_type: Type of transaction ('Purchase', 'Bill', 'Invoice', etc.)
+            transaction_id: ID of the transaction
+            content_type: MIME type
+            note: Optional note about the attachment
+            
+        Returns:
+            Attachable object with transaction reference
+        """
+        # Step 1: Upload the file
+        upload_response = self.upload_receipt(
+            access_token,
+            realm_id,
+            file_content,
+            file_name,
+            content_type
+        )
+        
+        # Extract the attachable ID from the response
+        attachable = upload_response.get('Attachable', {})
+        attachable_id = attachable.get('Id')
+        
+        if not attachable_id:
+            raise ValueError('Upload response did not contain Attachable ID')
+        
+        # Step 2: Attach to the transaction
+        return self.attach_receipt_to_transaction(
+            access_token,
+            realm_id,
+            attachable_id,
+            transaction_type,
+            transaction_id,
+            note
+        )

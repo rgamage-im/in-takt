@@ -19,6 +19,8 @@ from .api_views import (
     QuickBooksAccountsAPIView,
     QuickBooksProfitLossAPIView,
     QuickBooksBalanceSheetAPIView,
+    QuickBooksUploadReceiptAPIView,
+    QuickBooksAttachReceiptAPIView,
 )
 
 app_name = 'quickbooks'
@@ -41,6 +43,10 @@ urlpatterns = [
     path('api/vendors/', QuickBooksVendorsAPIView.as_view(), name='api-vendors'),
     path('api/expenses/', QuickBooksExpensesAPIView.as_view(), name='api-expenses'),
     path('api/accounts/', QuickBooksAccountsAPIView.as_view(), name='api-accounts'),
+    
+    # Attachments API
+    path('api/upload-receipt/', QuickBooksUploadReceiptAPIView.as_view(), name='api-upload-receipt'),
+    path('api/attach-receipt/', QuickBooksAttachReceiptAPIView.as_view(), name='api-attach-receipt'),
     
     # Reports API
     path('api/reports/profit-loss/', QuickBooksProfitLossAPIView.as_view(), name='api-profit-loss'),

@@ -6,8 +6,10 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
-from drf_spectacular.utils import extend_schema, OpenApiParameter
+from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
+from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiExample
 from drf_spectacular.types import OpenApiTypes
+import base64
 
 from .services import QuickBooksService
 
@@ -325,3 +327,207 @@ class QuickBooksBalanceSheetAPIView(APIView):
             return Response(report, status=status.HTTP_200_OK)
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class QuickBooksUploadReceiptAPIView(APIView):
+    """
+    Upload a receipt to QuickBooks and optionally attach to a transaction
+    """
+    permission_classes = [IsAuthenticated]
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
+    
+    @extend_schema(
+        summary="Upload Receipt to QuickBooks",
+        description="""
+        Upload a receipt file to QuickBooks and optionally attach it to a transaction.
+        
+        **For file upload (multipart/form-data):**
+        - `file`: The receipt file (image or PDF)
+        - `transaction_type`: Optional - Type of transaction (Purchase, Bill, Invoice, etc.)
+        - `transaction_id`: Optional - ID of the transaction to attach to
+        - `note`: Optional - Note about the receipt
+        
+        **For base64 upload (application/json):**
+        ```json
+        {
+          "file_content": "base64_encoded_file_content",
+          "file_name": "receipt.jpg",
+          "content_type": "image/jpeg",
+          "transaction_type": "Purchase",
+          "transaction_id": "123",
+          "note": "Office supplies receipt"
+        }
+        ```
+        
+        If transaction_type and transaction_id are provided, the receipt will be automatically attached.
+        Otherwise, just the upload response with Attachable ID will be returned.
+        """,
+        responses={
+            200: {
+                "description": "Receipt uploaded successfully",
+                "example": {
+                    "Attachable": {
+                        "Id": "123",
+                        "FileName": "receipt.jpg",
+                        "FileAccessUri": "https://...",
+                        "AttachableRef": []
+                    }
+                }
+            },
+            401: {"description": "Not authenticated with QuickBooks"},
+            400: {"description": "Invalid request"}
+        },
+        tags=['QuickBooks Attachments']
+    )
+    def post(self, request):
+        access_token = request.session.get('qb_access_token')
+        realm_id = request.session.get('qb_realm_id')
+        
+        if not access_token or not realm_id:
+            return Response(
+                {
+                    'error': 'Not authenticated with QuickBooks',
+                    'login_url': '/quickbooks/login/'
+                },
+                status=status.HTTP_401_UNAUTHORIZED
+            )
+        
+        try:
+            qb_service = QuickBooksService()
+            
+            # Handle file upload (multipart/form-data)
+            if 'file' in request.FILES:
+                uploaded_file = request.FILES['file']
+                file_content = uploaded_file.read()
+                file_name = uploaded_file.name
+                content_type = uploaded_file.content_type or 'application/octet-stream'
+            
+            # Handle base64 upload (JSON)
+            elif 'file_content' in request.data:
+                file_content = base64.b64decode(request.data['file_content'])
+                file_name = request.data.get('file_name', 'receipt.jpg')
+                content_type = request.data.get('content_type', 'image/jpeg')
+            
+            else:
+                return Response(
+                    {'error': 'No file provided. Include either "file" (multipart) or "file_content" (base64 JSON)'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Get optional transaction attachment parameters
+            transaction_type = request.data.get('transaction_type')
+            transaction_id = request.data.get('transaction_id')
+            note = request.data.get('note')
+            
+            # If transaction details provided, upload and attach in one call
+            if transaction_type and transaction_id:
+                result = qb_service.upload_and_attach_receipt(
+                    access_token,
+                    realm_id,
+                    file_content,
+                    file_name,
+                    transaction_type,
+                    transaction_id,
+                    content_type,
+                    note
+                )
+                return Response(result, status=status.HTTP_200_OK)
+            
+            # Otherwise, just upload the file
+            else:
+                result = qb_service.upload_receipt(
+                    access_token,
+                    realm_id,
+                    file_content,
+                    file_name,
+                    content_type
+                )
+                return Response(result, status=status.HTTP_200_OK)
+        
+        except Exception as e:
+            return Response(
+                {'error': str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+
+class QuickBooksAttachReceiptAPIView(APIView):
+    """
+    Attach an already-uploaded receipt to a transaction
+    """
+    permission_classes = [IsAuthenticated]
+    
+    @extend_schema(
+        summary="Attach Receipt to Transaction",
+        description="""
+        Attach an already-uploaded receipt (by Attachable ID) to a QuickBooks transaction.
+        
+        **Request Body:**
+        ```json
+        {
+          "attachable_id": "123",
+          "transaction_type": "Purchase",
+          "transaction_id": "456",
+          "note": "Receipt for office supplies"
+        }
+        ```
+        """,
+        request={
+            "application/json": {
+                "example": {
+                    "attachable_id": "123",
+                    "transaction_type": "Purchase",
+                    "transaction_id": "456",
+                    "note": "Receipt for office supplies"
+                }
+            }
+        },
+        responses={
+            200: {"description": "Receipt attached successfully"},
+            401: {"description": "Not authenticated with QuickBooks"},
+            400: {"description": "Invalid request"}
+        },
+        tags=['QuickBooks Attachments']
+    )
+    def post(self, request):
+        access_token = request.session.get('qb_access_token')
+        realm_id = request.session.get('qb_realm_id')
+        
+        if not access_token or not realm_id:
+            return Response(
+                {
+                    'error': 'Not authenticated with QuickBooks',
+                    'login_url': '/quickbooks/login/'
+                },
+                status=status.HTTP_401_UNAUTHORIZED
+            )
+        
+        try:
+            attachable_id = request.data.get('attachable_id')
+            transaction_type = request.data.get('transaction_type')
+            transaction_id = request.data.get('transaction_id')
+            note = request.data.get('note')
+            
+            if not all([attachable_id, transaction_type, transaction_id]):
+                return Response(
+                    {'error': 'Missing required fields: attachable_id, transaction_type, transaction_id'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            qb_service = QuickBooksService()
+            result = qb_service.attach_receipt_to_transaction(
+                access_token,
+                realm_id,
+                attachable_id,
+                transaction_type,
+                transaction_id,
+                note
+            )
+            
+            return Response(result, status=status.HTTP_200_OK)
+        
+        except Exception as e:
+            return Response(
+                {'error': str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )

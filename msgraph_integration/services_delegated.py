@@ -29,6 +29,9 @@ class GraphServiceDelegated:
             "Mail.Read",
             "ChannelMessage.Read.All",
             "Team.ReadBasic.All",
+            "Files.Read",
+            "Files.Read.All",
+            "Sites.Read.All",  # Required for SharePoint sites
         ]
         
         self.graph_endpoint = "https://graph.microsoft.com/v1.0"
@@ -310,3 +313,366 @@ class GraphServiceDelegated:
             result['teams'].append(team_data)
         
         return result
+    
+    # OneDrive / Files Methods
+    
+    def get_my_drive(self, access_token: str) -> Dict[str, Any]:
+        """
+        Get information about the user's default OneDrive
+        
+        Args:
+            access_token: User's access token
+            
+        Returns:
+            Drive information
+        """
+        endpoint = "/me/drive"
+        return self._make_request(endpoint, access_token)
+    
+    def list_drives(self, access_token: str) -> Dict[str, Any]:
+        """
+        List all drives available to the user
+        
+        Args:
+            access_token: User's access token
+            
+        Returns:
+            List of drives (OneDrive, SharePoint document libraries, etc.)
+        """
+        endpoint = "/me/drives"
+        return self._make_request(endpoint, access_token)
+    
+    def get_drive_root_children(self, access_token: str, drive_id: Optional[str] = None) -> Dict[str, Any]:
+        """
+        List files and folders in the root of a drive
+        
+        Args:
+            access_token: User's access token
+            drive_id: Optional drive ID (uses default drive if not provided)
+            
+        Returns:
+            List of items in the root folder
+        """
+        if drive_id:
+            endpoint = f"/drives/{drive_id}/root/children"
+        else:
+            endpoint = "/me/drive/root/children"
+        
+        return self._make_request(endpoint, access_token)
+    
+    def get_folder_contents(
+        self, 
+        access_token: str, 
+        folder_path: str, 
+        drive_id: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """
+        List files and folders in a specific folder by path
+        
+        Args:
+            access_token: User's access token
+            folder_path: Path to the folder (e.g., '/Documents' or '/Documents/Receipts')
+            drive_id: Optional drive ID (uses default drive if not provided)
+            
+        Returns:
+            List of items in the folder
+        """
+        # Remove leading/trailing slashes and normalize path
+        folder_path = folder_path.strip('/')
+        
+        if drive_id:
+            endpoint = f"/drives/{drive_id}/root:/{folder_path}:/children"
+        else:
+            endpoint = f"/me/drive/root:/{folder_path}:/children"
+        
+        return self._make_request(endpoint, access_token)
+    
+    def get_folder_contents_by_id(
+        self, 
+        access_token: str, 
+        item_id: str,
+        drive_id: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """
+        List files and folders in a specific folder by item ID
+        
+        Args:
+            access_token: User's access token
+            item_id: The ID of the folder
+            drive_id: Optional drive ID (uses default drive if not provided)
+            
+        Returns:
+            List of items in the folder
+        """
+        if drive_id:
+            endpoint = f"/drives/{drive_id}/items/{item_id}/children"
+        else:
+            endpoint = f"/me/drive/items/{item_id}/children"
+        
+        return self._make_request(endpoint, access_token)
+    
+    def search_onedrive(
+        self, 
+        access_token: str, 
+        query: str,
+        drive_id: Optional[str] = None,
+        top: int = 50
+    ) -> Dict[str, Any]:
+        """
+        Search for files and folders in OneDrive
+        
+        Args:
+            access_token: User's access token
+            query: Search query string
+            drive_id: Optional drive ID (uses default drive if not provided)
+            top: Maximum number of results to return
+            
+        Returns:
+            Search results containing matching files and folders
+        """
+        if drive_id:
+            endpoint = f"/drives/{drive_id}/root/search(q='{query}')?$top={top}"
+        else:
+            endpoint = f"/me/drive/root/search(q='{query}')?$top={top}"
+        
+        return self._make_request(endpoint, access_token)
+    
+    def get_item_by_path(
+        self,
+        access_token: str,
+        item_path: str,
+        drive_id: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """
+        Get a specific file or folder by its path
+        
+        Args:
+            access_token: User's access token
+            item_path: Path to the item (e.g., '/Documents/report.pdf')
+            drive_id: Optional drive ID (uses default drive if not provided)
+            
+        Returns:
+            Item metadata
+        """
+        # Remove leading/trailing slashes and normalize path
+        item_path = item_path.strip('/')
+        
+        if drive_id:
+            endpoint = f"/drives/{drive_id}/root:/{item_path}"
+        else:
+            endpoint = f"/me/drive/root:/{item_path}"
+        
+        return self._make_request(endpoint, access_token)
+    
+    def search_all_drives(
+        self,
+        access_token: str,
+        query: str,
+        top: int = 50
+    ) -> Dict[str, Any]:
+        """
+        Search across ALL drives the user has access to (personal OneDrive + SharePoint)
+        
+        Args:
+            access_token: User's access token
+            query: Search query string
+            top: Maximum number of results per drive (default: 50)
+            
+        Returns:
+            Combined search results from all drives with drive metadata
+        """
+        # First, get all available drives
+        drives_response = self.list_drives(access_token)
+        drives = drives_response.get('value', [])
+        
+        # Search each drive and combine results
+        all_results = []
+        
+        for drive in drives:
+            drive_id = drive.get('id')
+            drive_name = drive.get('name', 'Unknown')
+            drive_type = drive.get('driveType', 'unknown')
+            
+            try:
+                # Search this drive
+                search_results = self.search_onedrive(access_token, query, drive_id, top)
+                
+                # Add drive metadata to each result
+                for item in search_results.get('value', []):
+                    item['_driveInfo'] = {
+                        'id': drive_id,
+                        'name': drive_name,
+                        'type': drive_type
+                    }
+                    all_results.append(item)
+            except Exception as e:
+                # If search fails for a drive, log it but continue with other drives
+                print(f"Failed to search drive {drive_name} ({drive_id}): {str(e)}")
+                continue
+        
+        return {
+            'value': all_results,
+            'totalDrivesSearched': len(drives),
+            'totalResults': len(all_results)
+        }
+    
+    # SharePoint Sites Methods
+    
+    def get_sharepoint_sites(
+        self,
+        access_token: str,
+        search_query: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """
+        Get SharePoint sites the user has access to
+        
+        Args:
+            access_token: User's access token
+            search_query: Optional search query to filter sites
+            
+        Returns:
+            List of SharePoint sites
+        """
+        if search_query:
+            # Search for sites by name
+            endpoint = f"/sites?search={search_query}"
+        else:
+            # Get followed/frequently accessed sites
+            endpoint = "/sites?search=*"
+        
+        return self._make_request(endpoint, access_token)
+    
+    def get_site_drives(
+        self,
+        access_token: str,
+        site_id: str
+    ) -> Dict[str, Any]:
+        """
+        Get all document libraries (drives) for a specific SharePoint site
+        
+        Args:
+            access_token: User's access token
+            site_id: SharePoint site ID
+            
+        Returns:
+            List of document libraries (drives) in the site
+        """
+        endpoint = f"/sites/{site_id}/drives"
+        return self._make_request(endpoint, access_token)
+    
+    def list_all_accessible_drives(
+        self,
+        access_token: str
+    ) -> Dict[str, Any]:
+        """
+        Get ALL drives user has access to, including:
+        - Personal OneDrive
+        - SharePoint site document libraries
+        
+        This is more comprehensive than list_drives() which only returns
+        drives where the user is the owner.
+        
+        Args:
+            access_token: User's access token
+            
+        Returns:
+            Combined list of all accessible drives with metadata
+        """
+        all_drives = []
+        
+        # 1. Get user's personal drives (OneDrive)
+        try:
+            personal_drives = self.list_drives(access_token)
+            for drive in personal_drives.get('value', []):
+                drive['_source'] = 'personal'
+                all_drives.append(drive)
+        except Exception as e:
+            print(f"Failed to get personal drives: {str(e)}")
+        
+        # 2. Get SharePoint sites and their drives
+        try:
+            sites_response = self.get_sharepoint_sites(access_token)
+            sites = sites_response.get('value', [])
+            
+            for site in sites:
+                site_id = site.get('id')
+                site_name = site.get('displayName', site.get('name', 'Unknown'))
+                
+                try:
+                    # Get all document libraries for this site
+                    site_drives = self.get_site_drives(access_token, site_id)
+                    
+                    for drive in site_drives.get('value', []):
+                        drive['_source'] = 'sharepoint'
+                        drive['_siteName'] = site_name
+                        drive['_siteId'] = site_id
+                        all_drives.append(drive)
+                except Exception as e:
+                    print(f"Failed to get drives for site {site_name}: {str(e)}")
+                    continue
+        except Exception as e:
+            print(f"Failed to get SharePoint sites: {str(e)}")
+        
+        return {
+            'value': all_drives,
+            'totalDrives': len(all_drives)
+        }
+    
+    def search_all_drives_including_sharepoint(
+        self,
+        access_token: str,
+        query: str,
+        top: int = 50
+    ) -> Dict[str, Any]:
+        """
+        Search across ALL accessible drives including SharePoint sites
+        
+        This is an enhanced version of search_all_drives() that also
+        includes SharePoint document libraries.
+        
+        Args:
+            access_token: User's access token
+            query: Search query string
+            top: Maximum number of results per drive (default: 50)
+            
+        Returns:
+            Combined search results from all drives with drive metadata
+        """
+        # Get all accessible drives (including SharePoint)
+        all_drives_response = self.list_all_accessible_drives(access_token)
+        drives = all_drives_response.get('value', [])
+        
+        # Search each drive and combine results
+        all_results = []
+        
+        for drive in drives:
+            drive_id = drive.get('id')
+            drive_name = drive.get('name', 'Unknown')
+            drive_type = drive.get('driveType', 'unknown')
+            source = drive.get('_source', 'unknown')
+            site_name = drive.get('_siteName', '')
+            
+            try:
+                # Search this drive
+                search_results = self.search_onedrive(access_token, query, drive_id, top)
+                
+                # Add drive metadata to each result
+                for item in search_results.get('value', []):
+                    item['_driveInfo'] = {
+                        'id': drive_id,
+                        'name': drive_name,
+                        'type': drive_type,
+                        'source': source,
+                        'siteName': site_name
+                    }
+                    all_results.append(item)
+            except Exception as e:
+                # If search fails for a drive, log it but continue with other drives
+                print(f"Failed to search drive {drive_name} ({drive_id}): {str(e)}")
+                continue
+        
+        return {
+            'value': all_results,
+            'totalDrivesSearched': len(drives),
+            'totalResults': len(all_results)
+        }

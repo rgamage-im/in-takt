@@ -15,7 +15,15 @@ from .api_views import (
     MyMessagesAPIView, 
     MyCalendarAPIView,
     MyTeamsAPIView,
-    MyTeamsChannelMessagesAPIView
+    MyTeamsChannelMessagesAPIView,
+    MyOneDriveAPIView,
+    MyDrivesListAPIView,
+    OneDriveFolderContentsAPIView,
+    OneDriveSearchAPIView,
+    OneDriveSearchAllAPIView,
+    SharePointSitesAPIView,
+    AllAccessibleDrivesAPIView,
+    SearchAllDrivesIncludingSharePointAPIView
 )
 
 app_name = 'msgraph'
@@ -41,4 +49,16 @@ urlpatterns = [
     path('api/me/calendar/', MyCalendarAPIView.as_view(), name='api-my-calendar'),
     path('api/me/teams/', MyTeamsAPIView.as_view(), name='api-my-teams'),
     path('api/me/teams/messages/', MyTeamsChannelMessagesAPIView.as_view(), name='api-my-teams-messages'),
+    
+    # OneDrive API Routes
+    path('api/me/drive/', MyOneDriveAPIView.as_view(), name='api-my-drive'),
+    path('api/me/drives/', MyDrivesListAPIView.as_view(), name='api-my-drives-list'),
+    path('api/me/drive/contents/', OneDriveFolderContentsAPIView.as_view(), name='api-drive-folder-contents'),
+    path('api/me/drive/search/', OneDriveSearchAPIView.as_view(), name='api-drive-search'),
+    path('api/me/drive/search-all/', OneDriveSearchAllAPIView.as_view(), name='api-drive-search-all'),
+    
+    # SharePoint API Routes
+    path('api/sharepoint/sites/', SharePointSitesAPIView.as_view(), name='api-sharepoint-sites'),
+    path('api/drives/all/', AllAccessibleDrivesAPIView.as_view(), name='api-all-drives'),
+    path('api/drives/search-all/', SearchAllDrivesIncludingSharePointAPIView.as_view(), name='api-search-all-drives'),
 ]

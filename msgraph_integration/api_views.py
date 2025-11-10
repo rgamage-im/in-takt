@@ -6,7 +6,8 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
-from drf_spectacular.utils import extend_schema
+from drf_spectacular.utils import extend_schema, OpenApiParameter
+from drf_spectacular.types import OpenApiTypes
 
 from .services_delegated import GraphServiceDelegated
 from .serializers import UserProfileSerializer
@@ -257,3 +258,492 @@ class MyTeamsChannelMessagesAPIView(APIView):
                 {'error': str(e)},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
+
+
+class MyOneDriveAPIView(APIView):
+    """
+    Get user's OneDrive information
+    """
+    permission_classes = [IsAuthenticated]
+    
+    @extend_schema(
+        summary="Get My OneDrive",
+        description="Retrieve information about the authenticated user's OneDrive",
+        responses={200: dict},
+        tags=['Microsoft Graph - OneDrive']
+    )
+    def get(self, request):
+        """
+        Get current user's OneDrive info
+        """
+        access_token = request.session.get('graph_access_token')
+        
+        if not access_token:
+            return Response(
+                {'error': 'Not authenticated with Microsoft', 'login_url': '/graph/login/'},
+                status=status.HTTP_401_UNAUTHORIZED
+            )
+        
+        try:
+            graph_service = GraphServiceDelegated()
+            drive_data = graph_service.get_my_drive(access_token)
+            
+            return Response(drive_data, status=status.HTTP_200_OK)
+            
+        except Exception as e:
+            return Response(
+                {'error': str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+
+class MyDrivesListAPIView(APIView):
+    """
+    List all drives available to the user
+    """
+    permission_classes = [IsAuthenticated]
+    
+    @extend_schema(
+        summary="List My Drives",
+        description="Retrieve all drives available to the user (OneDrive, SharePoint sites, etc.)",
+        responses={200: dict},
+        tags=['Microsoft Graph - OneDrive']
+    )
+    def get(self, request):
+        """
+        List all available drives
+        """
+        access_token = request.session.get('graph_access_token')
+        
+        if not access_token:
+            return Response(
+                {'error': 'Not authenticated with Microsoft', 'login_url': '/graph/login/'},
+                status=status.HTTP_401_UNAUTHORIZED
+            )
+        
+        try:
+            graph_service = GraphServiceDelegated()
+            drives_data = graph_service.list_drives(access_token)
+            
+            return Response(drives_data, status=status.HTTP_200_OK)
+            
+        except Exception as e:
+            return Response(
+                {'error': str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+
+class OneDriveFolderContentsAPIView(APIView):
+    """
+    List contents of a OneDrive folder
+    """
+    permission_classes = [IsAuthenticated]
+    
+    @extend_schema(
+        summary="List Folder Contents",
+        description="""
+        List files and folders in a OneDrive folder.
+        
+        You can specify the folder by:
+        - **path**: Folder path (e.g., '/Documents' or '/Documents/Receipts')
+        - **item_id**: Folder ID
+        - Neither (returns root folder contents)
+        
+        Query parameters:
+        - `path`: Folder path (e.g., 'Documents/Receipts')
+        - `item_id`: Folder item ID
+        - `drive_id`: Optional drive ID (uses default OneDrive if not specified)
+        """,
+        parameters=[
+            OpenApiParameter(
+                name='path',
+                type=OpenApiTypes.STR,
+                location=OpenApiParameter.QUERY,
+                description='Folder path (e.g., "Documents/Receipts")',
+            ),
+            OpenApiParameter(
+                name='item_id',
+                type=OpenApiTypes.STR,
+                location=OpenApiParameter.QUERY,
+                description='Folder item ID',
+            ),
+            OpenApiParameter(
+                name='drive_id',
+                type=OpenApiTypes.STR,
+                location=OpenApiParameter.QUERY,
+                description='Drive ID (optional, uses default OneDrive if not specified)',
+            ),
+        ],
+        responses={200: dict},
+        tags=['Microsoft Graph - OneDrive']
+    )
+    def get(self, request):
+        """
+        Get folder contents by path or ID
+        """
+        access_token = request.session.get('graph_access_token')
+        
+        if not access_token:
+            return Response(
+                {'error': 'Not authenticated with Microsoft', 'login_url': '/graph/login/'},
+                status=status.HTTP_401_UNAUTHORIZED
+            )
+        
+        try:
+            folder_path = request.query_params.get('path')
+            item_id = request.query_params.get('item_id')
+            drive_id = request.query_params.get('drive_id')
+            
+            graph_service = GraphServiceDelegated()
+            
+            # Priority: item_id > path > root
+            if item_id:
+                contents = graph_service.get_folder_contents_by_id(access_token, item_id, drive_id)
+            elif folder_path:
+                contents = graph_service.get_folder_contents(access_token, folder_path, drive_id)
+            else:
+                contents = graph_service.get_drive_root_children(access_token, drive_id)
+            
+            return Response(contents, status=status.HTTP_200_OK)
+            
+        except Exception as e:
+            return Response(
+                {'error': str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+
+class OneDriveSearchAPIView(APIView):
+    """
+    Search OneDrive for files and folders
+    """
+    permission_classes = [IsAuthenticated]
+    
+    @extend_schema(
+        summary="Search OneDrive",
+        description="""
+        Search for files and folders in OneDrive.
+        
+        The search query can match:
+        - File names
+        - Folder names
+        - File content (for supported file types)
+        
+        Query parameters:
+        - `q`: Search query (required)
+        - `drive_id`: Optional drive ID (uses default OneDrive if not specified)
+        - `top`: Maximum number of results (default: 50)
+        """,
+        parameters=[
+            OpenApiParameter(
+                name='q',
+                type=OpenApiTypes.STR,
+                location=OpenApiParameter.QUERY,
+                description='Search query',
+                required=True,
+            ),
+            OpenApiParameter(
+                name='drive_id',
+                type=OpenApiTypes.STR,
+                location=OpenApiParameter.QUERY,
+                description='Drive ID (optional)',
+            ),
+            OpenApiParameter(
+                name='top',
+                type=OpenApiTypes.INT,
+                location=OpenApiParameter.QUERY,
+                description='Maximum results (default: 50)',
+            ),
+        ],
+        responses={200: dict},
+        tags=['Microsoft Graph - OneDrive']
+    )
+    def get(self, request):
+        """
+        Search OneDrive
+        """
+        access_token = request.session.get('graph_access_token')
+        
+        if not access_token:
+            return Response(
+                {'error': 'Not authenticated with Microsoft', 'login_url': '/graph/login/'},
+                status=status.HTTP_401_UNAUTHORIZED
+            )
+        
+        query = request.query_params.get('q')
+        if not query:
+            return Response(
+                {'error': 'Missing required parameter: q (search query)'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            drive_id = request.query_params.get('drive_id')
+            top = int(request.query_params.get('top', 50))
+            
+            graph_service = GraphServiceDelegated()
+            results = graph_service.search_onedrive(access_token, query, drive_id, top)
+            
+            return Response(results, status=status.HTTP_200_OK)
+            
+        except Exception as e:
+            return Response(
+                {'error': str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+
+class OneDriveSearchAllAPIView(APIView):
+    """
+    Search across ALL drives (personal OneDrive + SharePoint)
+    """
+    permission_classes = [IsAuthenticated]
+    
+    @extend_schema(
+        summary="Search All Drives",
+        description="""
+        Search for files and folders across ALL drives accessible to the user.
+        
+        This includes:
+        - Personal OneDrive
+        - SharePoint document libraries
+        - Shared drives
+        
+        Each result includes drive information (_driveInfo) indicating which drive it came from.
+        
+        Query parameters:
+        - `q`: Search query (required)
+        - `top`: Maximum number of results per drive (default: 50)
+        
+        Note: This may be slower than single-drive search as it queries multiple drives.
+        """,
+        parameters=[
+            OpenApiParameter(
+                name='q',
+                type=OpenApiTypes.STR,
+                location=OpenApiParameter.QUERY,
+                description='Search query',
+                required=True,
+            ),
+            OpenApiParameter(
+                name='top',
+                type=OpenApiTypes.INT,
+                location=OpenApiParameter.QUERY,
+                description='Maximum results per drive (default: 50)',
+            ),
+        ],
+        responses={200: dict},
+        tags=['Microsoft Graph - OneDrive']
+    )
+    def get(self, request):
+        """
+        Search all accessible drives
+        """
+        access_token = request.session.get('graph_access_token')
+        
+        if not access_token:
+            return Response(
+                {'error': 'Not authenticated with Microsoft', 'login_url': '/graph/login/'},
+                status=status.HTTP_401_UNAUTHORIZED
+            )
+        
+        query = request.query_params.get('q')
+        if not query:
+            return Response(
+                {'error': 'Missing required parameter: q (search query)'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            top = int(request.query_params.get('top', 50))
+            
+            graph_service = GraphServiceDelegated()
+            results = graph_service.search_all_drives(access_token, query, top)
+            
+            return Response(results, status=status.HTTP_200_OK)
+            
+        except Exception as e:
+            return Response(
+                {'error': str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+
+class SharePointSitesAPIView(APIView):
+    """
+    Get SharePoint sites the user has access to
+    """
+    permission_classes = [IsAuthenticated]
+    
+    @extend_schema(
+        summary="List SharePoint Sites",
+        description="""
+        Retrieve SharePoint sites the user has access to.
+        
+        Query parameters:
+        - `search`: Optional search query to filter sites by name
+        """,
+        parameters=[
+            OpenApiParameter(
+                name='search',
+                type=OpenApiTypes.STR,
+                location=OpenApiParameter.QUERY,
+                description='Search query to filter sites',
+            ),
+        ],
+        responses={200: dict},
+        tags=['Microsoft Graph - SharePoint']
+    )
+    def get(self, request):
+        """
+        List accessible SharePoint sites
+        """
+        access_token = request.session.get('graph_access_token')
+        
+        if not access_token:
+            return Response(
+                {'error': 'Not authenticated with Microsoft', 'login_url': '/graph/login/'},
+                status=status.HTTP_401_UNAUTHORIZED
+            )
+        
+        try:
+            search_query = request.query_params.get('search')
+            
+            graph_service = GraphServiceDelegated()
+            sites = graph_service.get_sharepoint_sites(access_token, search_query)
+            
+            return Response(sites, status=status.HTTP_200_OK)
+            
+        except Exception as e:
+            return Response(
+                {'error': str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+
+class AllAccessibleDrivesAPIView(APIView):
+    """
+    Get ALL drives including SharePoint document libraries
+    """
+    permission_classes = [IsAuthenticated]
+    
+    @extend_schema(
+        summary="List All Accessible Drives (OneDrive + SharePoint)",
+        description="""
+        Retrieve ALL drives the user has access to, including:
+        - Personal OneDrive for Business
+        - SharePoint site document libraries
+        
+        This is more comprehensive than /api/me/drives/ which only returns
+        drives where the user is the owner. This endpoint includes all
+        SharePoint team sites and their document libraries.
+        
+        Each drive includes:
+        - `_source`: 'personal' or 'sharepoint'
+        - `_siteName`: SharePoint site name (for SharePoint drives)
+        - `_siteId`: SharePoint site ID (for SharePoint drives)
+        """,
+        responses={200: dict},
+        tags=['Microsoft Graph - SharePoint']
+    )
+    def get(self, request):
+        """
+        List all accessible drives including SharePoint
+        """
+        access_token = request.session.get('graph_access_token')
+        
+        if not access_token:
+            return Response(
+                {'error': 'Not authenticated with Microsoft', 'login_url': '/graph/login/'},
+                status=status.HTTP_401_UNAUTHORIZED
+            )
+        
+        try:
+            graph_service = GraphServiceDelegated()
+            all_drives = graph_service.list_all_accessible_drives(access_token)
+            
+            return Response(all_drives, status=status.HTTP_200_OK)
+            
+        except Exception as e:
+            return Response(
+                {'error': str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+
+class SearchAllDrivesIncludingSharePointAPIView(APIView):
+    """
+    Search across ALL drives including SharePoint
+    """
+    permission_classes = [IsAuthenticated]
+    
+    @extend_schema(
+        summary="Search All Drives + SharePoint",
+        description="""
+        Search for files and folders across ALL accessible drives including SharePoint.
+        
+        This includes:
+        - Personal OneDrive for Business
+        - SharePoint team site document libraries
+        - Shared drives
+        
+        Each result includes enhanced drive information:
+        - `source`: 'personal' or 'sharepoint'
+        - `siteName`: SharePoint site name (for SharePoint files)
+        
+        Query parameters:
+        - `q`: Search query (required)
+        - `top`: Maximum number of results per drive (default: 50)
+        """,
+        parameters=[
+            OpenApiParameter(
+                name='q',
+                type=OpenApiTypes.STR,
+                location=OpenApiParameter.QUERY,
+                description='Search query',
+                required=True,
+            ),
+            OpenApiParameter(
+                name='top',
+                type=OpenApiTypes.INT,
+                location=OpenApiParameter.QUERY,
+                description='Maximum results per drive (default: 50)',
+            ),
+        ],
+        responses={200: dict},
+        tags=['Microsoft Graph - SharePoint']
+    )
+    def get(self, request):
+        """
+        Search all accessible drives including SharePoint
+        """
+        access_token = request.session.get('graph_access_token')
+        
+        if not access_token:
+            return Response(
+                {'error': 'Not authenticated with Microsoft', 'login_url': '/graph/login/'},
+                status=status.HTTP_401_UNAUTHORIZED
+            )
+        
+        query = request.query_params.get('q')
+        if not query:
+            return Response(
+                {'error': 'Missing required parameter: q (search query)'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            top = int(request.query_params.get('top', 50))
+            
+            graph_service = GraphServiceDelegated()
+            results = graph_service.search_all_drives_including_sharepoint(access_token, query, top)
+            
+            return Response(results, status=status.HTTP_200_OK)
+            
+        except Exception as e:
+            return Response(
+                {'error': str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+

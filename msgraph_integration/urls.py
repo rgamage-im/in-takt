@@ -23,7 +23,8 @@ from .api_views import (
     OneDriveSearchAllAPIView,
     SharePointSitesAPIView,
     AllAccessibleDrivesAPIView,
-    SearchAllDrivesIncludingSharePointAPIView
+    SearchAllDrivesIncludingSharePointAPIView,
+    ExpenseReceiptsAPIView
 )
 
 app_name = 'msgraph'
@@ -61,4 +62,7 @@ urlpatterns = [
     path('api/sharepoint/sites/', SharePointSitesAPIView.as_view(), name='api-sharepoint-sites'),
     path('api/drives/all/', AllAccessibleDrivesAPIView.as_view(), name='api-all-drives'),
     path('api/drives/search-all/', SearchAllDrivesIncludingSharePointAPIView.as_view(), name='api-search-all-drives'),
+    
+    # Expense Receipts API
+    path('api/receipts/expense/', ExpenseReceiptsAPIView.as_view(), name='api-expense-receipts'),
 ]

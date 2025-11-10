@@ -747,3 +747,77 @@ class SearchAllDrivesIncludingSharePointAPIView(APIView):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
+
+class ExpenseReceiptsAPIView(APIView):
+    """
+    Get expense receipts from SharePoint folder
+    """
+    permission_classes = [IsAuthenticated]
+    
+    @extend_schema(
+        summary="List Expense Receipts",
+        description="""
+        Retrieve all expense receipt files from the designated SharePoint folder.
+        
+        Default location: Integral Methods > Documents > Expense Receipts
+        
+        Query parameters:
+        - `folder_id`: Override default folder ID (optional)
+        - `drive_id`: Override default drive ID (optional)
+        
+        Returns files only (not subfolders) with download URLs and metadata.
+        """,
+        parameters=[
+            OpenApiParameter(
+                name='folder_id',
+                type=OpenApiTypes.STR,
+                location=OpenApiParameter.QUERY,
+                description='SharePoint folder item ID (optional, uses default Expense Receipts folder)',
+            ),
+            OpenApiParameter(
+                name='drive_id',
+                type=OpenApiTypes.STR,
+                location=OpenApiParameter.QUERY,
+                description='SharePoint drive ID (optional, uses default Integral Methods Documents library)',
+            ),
+        ],
+        responses={200: dict},
+        tags=['Microsoft Graph - Receipts']
+    )
+    def get(self, request):
+        """
+        List expense receipt files
+        """
+        access_token = request.session.get('graph_access_token')
+        
+        if not access_token:
+            return Response(
+                {'error': 'Not authenticated with Microsoft', 'login_url': '/graph/login/'},
+                status=status.HTTP_401_UNAUTHORIZED
+            )
+        
+        try:
+            folder_id = request.query_params.get('folder_id')
+            drive_id = request.query_params.get('drive_id')
+            
+            graph_service = GraphServiceDelegated()
+            
+            # Call with custom IDs if provided, otherwise use defaults
+            if folder_id and drive_id:
+                receipts = graph_service.get_expense_receipts(access_token, folder_id, drive_id)
+            elif folder_id:
+                receipts = graph_service.get_expense_receipts(access_token, folder_id=folder_id)
+            elif drive_id:
+                receipts = graph_service.get_expense_receipts(access_token, drive_id=drive_id)
+            else:
+                receipts = graph_service.get_expense_receipts(access_token)
+            
+            return Response(receipts, status=status.HTTP_200_OK)
+            
+        except Exception as e:
+            return Response(
+                {'error': str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+

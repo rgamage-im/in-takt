@@ -676,3 +676,73 @@ class GraphServiceDelegated:
             'totalDrivesSearched': len(drives),
             'totalResults': len(all_results)
         }
+    
+    def get_expense_receipts(
+        self,
+        access_token: str,
+        folder_id: str = "01FUFIEDFYM6C7J3SLSBDZCH3NDO7KCVRK",
+        drive_id: str = "b!0F05pe1C2kK-wpKqi5Zc48axM_lpIdFNjnrGDD3PSm5M87XCUZy6TIbJKPIgDtH7"
+    ) -> Dict[str, Any]:
+        """
+        Get all expense receipt files from the specified SharePoint folder
+        
+        Default folder: Integral Methods SharePoint > Documents > Expense Receipts
+        
+        Args:
+            access_token: User's access token
+            folder_id: SharePoint folder item ID (defaults to Expense Receipts folder)
+            drive_id: SharePoint drive ID (defaults to Integral Methods Documents library)
+            
+        Returns:
+            List of files in the receipts folder with metadata
+        """
+        # Request additional fields including parentReference for path information
+        endpoint = f"/drives/{drive_id}/items/{folder_id}/children?$select=id,name,size,createdDateTime,lastModifiedDateTime,webUrl,file,createdBy,lastModifiedBy,parentReference,@microsoft.graph.downloadUrl"
+        
+        try:
+            results = self._make_request(endpoint, access_token)
+            
+            # Add metadata for convenience
+            files = []
+            for item in results.get('value', []):
+                # Only include files (not subfolders)
+                if 'file' in item:
+                    # Get the full path from parentReference
+                    parent_ref = item.get('parentReference', {})
+                    parent_path = parent_ref.get('path', '')
+                    
+                    # Extract the path after '/drive/root:' if present
+                    if '/drive/root:' in parent_path:
+                        folder_path = parent_path.split('/drive/root:')[-1]
+                    else:
+                        folder_path = parent_path
+                    
+                    # Construct full file path
+                    file_path = f"{folder_path}/{item.get('name')}" if folder_path else item.get('name')
+                    
+                    files.append({
+                        'id': item.get('id'),
+                        'name': item.get('name'),
+                        'path': file_path,
+                        'size': item.get('size'),
+                        'createdDateTime': item.get('createdDateTime'),
+                        'lastModifiedDateTime': item.get('lastModifiedDateTime'),
+                        'webUrl': item.get('webUrl'),
+                        'downloadUrl': item.get('@microsoft.graph.downloadUrl'),
+                        'mimeType': item.get('file', {}).get('mimeType'),
+                        'createdBy': item.get('createdBy', {}).get('user', {}).get('displayName'),
+                        'lastModifiedBy': item.get('lastModifiedBy', {}).get('user', {}).get('displayName'),
+                    })
+            
+            return {
+                'value': files,
+                'totalFiles': len(files),
+                'folderInfo': {
+                    'folderId': folder_id,
+                    'driveId': drive_id,
+                    'location': 'Integral Methods > Documents > People Stuff > Receipts'
+                }
+            }
+        except Exception as e:
+            raise Exception(f"Failed to get expense receipts: {str(e)}")
+

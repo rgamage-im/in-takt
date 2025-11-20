@@ -40,6 +40,9 @@ urlpatterns = [
     # QuickBooks OAuth and Dashboard
     path("quickbooks/", include("quickbooks_integration.urls")),
     
+    # Notion integration
+    path("notion/", include("notion_integration.urls")),
+    
     # API endpoints
     path("api/", include("api.urls")),
 ]

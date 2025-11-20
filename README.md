@@ -15,6 +15,7 @@ An internal data access portal that integrates Microsoft Graph API and QuickBook
 In-Takt is an internal-facing web application that centralizes access to company data from multiple sources:
 - **Microsoft 365** (via Microsoft Graph API)
 - **QuickBooks** (financial data)
+- **Notion** (knowledge base search)
 - **Unified API** for programmatic access
 - **Interactive Documentation** via Swagger/OpenAPI
 
@@ -118,6 +119,7 @@ Copy `.env.example` to `.env` and configure the following:
 - `QUICKBOOKS_CLIENT_ID` - QuickBooks client ID
 - `QUICKBOOKS_CLIENT_SECRET` - QuickBooks client secret
 - `QUICKBOOKS_REALM_ID` - QuickBooks company ID
+- `NOTION_INTERNAL_TOKEN` - Notion integration token (or `NOTION_API_TOKEN`)
 
 ### Optional Variables
 - `REDIS_URL` - Redis connection string
@@ -169,6 +171,12 @@ Located in `quickbooks_integration/`:
 - Expenses and payments
 - Financial reports
 - Time tracking
+
+### Notion API
+Located in `notion_integration/`:
+- Full-text search across pages and databases
+- Page metadata retrieval
+- Page/block content retrieval
 
 ## 📖 API Documentation
 

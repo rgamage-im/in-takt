@@ -69,6 +69,29 @@
             </div>
         </div>
 
+        <!-- Notion Card -->
+        <div class="bg-white overflow-hidden shadow rounded-lg hover:shadow-lg transition-shadow border-t-4" style="border-top-color: var(--color-light-sand);">
+            <div class="p-6">
+                <div class="flex items-center mb-4">
+                    <div class="flex-shrink-0 p-3 rounded-md" style="background-color: var(--color-light-sand);">
+                        <svg class="h-6 w-6" style="color: var(--color-deep-navy);" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v7a2 2 0 01-2 2H5a2 2 0 01-2-2V7z"></path>
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 13h6"></path>
+                        </svg>
+                    </div>
+                    <h3 class="ml-4 text-lg font-medium" style="color: var(--color-deep-navy);">
+                        Notion
+                    </h3>
+                </div>
+                <p class="text-sm text-gray-600 mb-4">
+                    Search company notes and pull page content from Notion.
+                </p>
+                <a href="/notion/api/search/?q=electrical" class="text-sm font-medium hover:underline" style="color: var(--color-warm-brick);">
+                    Try a search →
+                </a>
+            </div>
+        </div>
+
         <!-- API Documentation Card -->
         <div class="bg-white overflow-hidden shadow rounded-lg hover:shadow-lg transition-shadow border-t-4" style="border-top-color: var(--color-olive-gray);">
             <div class="p-6">
@@ -134,7 +157,19 @@
                     <p class="text-sm text-gray-600">Manage users, data, and settings</p>
                 </div>
             </a>
-            
+
+            <a href="/notion/api/search/?q=plumbing" class="flex items-center p-4 border border-gray-200 rounded-lg hover:border-gray-400 transition-colors">
+                <div class="flex-shrink-0 w-12 h-12 rounded-full flex items-center justify-center" style="background-color: var(--color-light-sand);">
+                    <svg class="h-6 w-6" style="color: var(--color-deep-navy);" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"></path>
+                    </svg>
+                </div>
+                <div class="ml-4">
+                    <h3 class="text-lg font-medium" style="color: var(--color-deep-navy);">Search Notion</h3>
+                    <p class="text-sm text-gray-600">Query knowledge base notes</p>
+                </div>
+            </a>
+
             <a href="/api/docs/" class="flex items-center p-4 border border-gray-200 rounded-lg hover:border-gray-400 transition-colors">
                 <div class="flex-shrink-0 w-12 h-12 rounded-full flex items-center justify-center" style="background-color: var(--color-olive-gray);">
                     <svg class="h-6 w-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">

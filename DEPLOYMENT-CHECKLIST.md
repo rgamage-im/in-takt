@@ -31,7 +31,7 @@ Add these environment variables:
 - [ ] DJANGO_LOG_LEVEL=INFO
 
 ### App Service > Configuration > General Settings
-- [ ] Startup Command: `bash startup.sh`
+- [ ] Startup Command: `/home/site/wwwroot/startup.sh`
 
 ## Azure AD App Registration
 - [ ] Add redirect URI: https://in-takt-portal-ezgqh2c2a2dsdyfu.westus2-01.azurewebsites.net/graph/callback/

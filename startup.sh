@@ -1,7 +1,15 @@
 #!/bin/bash
 # Azure App Service startup script for Django
 
+set -e  # Exit on error
+
 echo "Starting In-Takt Portal deployment..."
+echo "Current directory: $(pwd)"
+echo "Python version: $(python --version)"
+echo "Python path: $(which python)"
+
+# Change to the application directory
+cd /home/site/wwwroot
 
 # Collect static files
 echo "Collecting static files..."
@@ -12,8 +20,8 @@ echo "Running database migrations..."
 python manage.py migrate --noinput
 
 # Start Gunicorn
-echo "Starting Gunicorn..."
-gunicorn config.wsgi:application \
+echo "Starting Gunicorn on 0.0.0.0:8000..."
+exec gunicorn config.wsgi:application \
     --bind=0.0.0.0:8000 \
     --workers=4 \
     --timeout=600 \

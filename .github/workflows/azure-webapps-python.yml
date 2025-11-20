@@ -23,25 +23,26 @@ jobs:
       
       # Optional: Add step to run tests here (PyTest, Django test suites, etc.)
       
-      # Note: Dependencies and collectstatic are handled by Azure's Oryx during deployment
+      - name: Zip artifact for deployment
+        run: |
+          zip -r release.zip . \
+            -x '.git/*' \
+            -x '.github/*' \
+            -x '*.md' \
+            -x 'docs/*' \
+            -x 'tests/*' \
+            -x '*.pyc' \
+            -x '__pycache__/*' \
+            -x '*/__pycache__/*' \
+            -x '.env*' \
+            -x 'db.sqlite3' \
+            -x 'venv/*'
       
       - name: Upload artifact for deployment jobs
         uses: actions/upload-artifact@v4
         with:
           name: python-app
-          path: |
-            . 
-            !.git/
-            !.github/
-            !*.md
-            !docs/
-            !tests/
-            !*.pyc
-            !__pycache__/
-            !.gitignore
-            !.env*
-            !db.sqlite3
-            !venv/
+          path: release.zip
 
   deploy:
     permissions:
@@ -57,7 +58,6 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: python-app
-          path: .
           
       - name: 'Deploy to Azure Web App'
         id: deploy-to-webapp
@@ -65,3 +65,4 @@ jobs:
         with:
           app-name: ${{ env.AZURE_WEBAPP_NAME }}
           publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
+          package: release.zip

@@ -8,9 +8,6 @@ echo "Current directory: $(pwd)"
 echo "Python version: $(python --version)"
 echo "Python path: $(which python)"
 
-# Change to the application directory
-cd /home/site/wwwroot
-
 # Collect static files
 echo "Collecting static files..."
 python manage.py collectstatic --noinput

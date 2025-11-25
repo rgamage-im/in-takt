@@ -16,6 +16,10 @@ python manage.py collectstatic --noinput
 echo "Running database migrations..."
 python manage.py migrate --noinput
 
+# Ensure superuser exists (from env vars if set)
+echo "Ensuring superuser exists..."
+python manage.py ensure_superuser
+
 # Start Gunicorn
 echo "Starting Gunicorn on 0.0.0.0:8000..."
 exec gunicorn config.wsgi:application \

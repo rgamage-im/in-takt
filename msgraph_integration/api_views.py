@@ -8,6 +8,7 @@ from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from drf_spectacular.utils import extend_schema, OpenApiParameter
 from drf_spectacular.types import OpenApiTypes
+from django.http import HttpResponse
 
 from .services_delegated import GraphServiceDelegated
 from .serializers import UserProfileSerializer
@@ -815,6 +816,116 @@ class ExpenseReceiptsAPIView(APIView):
             return Response(receipts, status=status.HTTP_200_OK)
             
         except Exception as e:
+            return Response(
+                {'error': str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+
+class DownloadFileAPIView(APIView):
+    """
+    Download a file from OneDrive or SharePoint
+    """
+    permission_classes = [IsAuthenticated]
+    
+    @extend_schema(
+        summary="Download File",
+        description="""
+        Download a file from OneDrive or SharePoint by its item ID.
+        
+        The file will be returned as a binary download with appropriate content type.
+        
+        Query parameters:
+        - `item_id`: File item ID (required)
+        - `drive_id`: Drive ID (optional, uses default OneDrive if not specified)
+        
+        Example usage:
+        - `/api/me/drive/download?item_id=01ABC123...`
+        - `/api/me/drive/download?item_id=01ABC123...&drive_id=b!ABC123...`
+        """,
+        parameters=[
+            OpenApiParameter(
+                name='item_id',
+                type=OpenApiTypes.STR,
+                location=OpenApiParameter.QUERY,
+                description='File item ID',
+                required=True,
+            ),
+            OpenApiParameter(
+                name='drive_id',
+                type=OpenApiTypes.STR,
+                location=OpenApiParameter.QUERY,
+                description='Drive ID (optional, uses default OneDrive if not specified)',
+            ),
+        ],
+        responses={
+            200: {
+                'description': 'File content',
+                'content': {
+                    'application/octet-stream': {}
+                }
+            },
+            400: {'description': 'Missing required parameter: item_id'},
+            401: {'description': 'Not authenticated with Microsoft'},
+            404: {'description': 'File not found'},
+            500: {'description': 'Server error'}
+        },
+        tags=['Microsoft Graph - OneDrive']
+    )
+    def get(self, request):
+        """
+        Download file by item ID
+        """
+        access_token = request.session.get('graph_access_token')
+        
+        if not access_token:
+            return Response(
+                {'error': 'Not authenticated with Microsoft', 'login_url': '/graph/login/'},
+                status=status.HTTP_401_UNAUTHORIZED
+            )
+        
+        item_id = request.query_params.get('item_id')
+        if not item_id:
+            return Response(
+                {'error': 'Missing required parameter: item_id'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            drive_id = request.query_params.get('drive_id')
+            
+            graph_service = GraphServiceDelegated()
+            
+            # Get file metadata first to get filename and mime type
+            if drive_id:
+                endpoint = f"/drives/{drive_id}/items/{item_id}"
+            else:
+                endpoint = f"/me/drive/items/{item_id}"
+            
+            file_metadata = graph_service._make_request(endpoint, access_token)
+            filename = file_metadata.get('name', 'download')
+            mime_type = file_metadata.get('file', {}).get('mimeType', 'application/octet-stream')
+            
+            # Download the file content
+            file_content = graph_service.download_file(access_token, item_id, drive_id)
+            
+            # Return as HTTP response with appropriate headers
+            response = HttpResponse(file_content, content_type=mime_type)
+            response['Content-Disposition'] = f'attachment; filename="{filename}"'
+            response['Content-Length'] = len(file_content)
+            
+            return response
+            
+        except Exception as e:
+            error_message = str(e)
+            
+            # Handle specific error cases
+            if '404' in error_message or 'not found' in error_message.lower():
+                return Response(
+                    {'error': 'File not found', 'details': error_message},
+                    status=status.HTTP_404_NOT_FOUND
+                )
+            
             return Response(
                 {'error': str(e)},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR

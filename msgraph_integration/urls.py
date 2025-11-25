@@ -24,7 +24,8 @@ from .api_views import (
     SharePointSitesAPIView,
     AllAccessibleDrivesAPIView,
     SearchAllDrivesIncludingSharePointAPIView,
-    ExpenseReceiptsAPIView
+    ExpenseReceiptsAPIView,
+    DownloadFileAPIView
 )
 
 app_name = 'msgraph'
@@ -57,6 +58,7 @@ urlpatterns = [
     path('api/me/drive/contents/', OneDriveFolderContentsAPIView.as_view(), name='api-drive-folder-contents'),
     path('api/me/drive/search/', OneDriveSearchAPIView.as_view(), name='api-drive-search'),
     path('api/me/drive/search-all/', OneDriveSearchAllAPIView.as_view(), name='api-drive-search-all'),
+    path('api/me/drive/download/', DownloadFileAPIView.as_view(), name='api-download-file'),
     
     # SharePoint API Routes
     path('api/sharepoint/sites/', SharePointSitesAPIView.as_view(), name='api-sharepoint-sites'),

@@ -732,6 +732,7 @@ class GraphServiceDelegated:
                         'mimeType': item.get('file', {}).get('mimeType'),
                         'createdBy': item.get('createdBy', {}).get('user', {}).get('displayName'),
                         'lastModifiedBy': item.get('lastModifiedBy', {}).get('user', {}).get('displayName'),
+                        'driveId': drive_id,  # Include drive_id for easy downloading
                     })
             
             return {
@@ -745,4 +746,43 @@ class GraphServiceDelegated:
             }
         except Exception as e:
             raise Exception(f"Failed to get expense receipts: {str(e)}")
+    
+    def download_file(
+        self,
+        access_token: str,
+        item_id: str,
+        drive_id: Optional[str] = None
+    ) -> bytes:
+        """
+        Download a file's content from OneDrive or SharePoint
+        
+        Args:
+            access_token: User's access token
+            item_id: The ID of the file to download
+            drive_id: Optional drive ID (uses default drive if not provided)
+            
+        Returns:
+            File content as bytes
+        """
+        # First get the file metadata to get the download URL
+        if drive_id:
+            endpoint = f"/drives/{drive_id}/items/{item_id}"
+        else:
+            endpoint = f"/me/drive/items/{item_id}"
+        
+        # Get file metadata including download URL
+        file_metadata = self._make_request(endpoint, access_token)
+        
+        # Get the download URL
+        download_url = file_metadata.get('@microsoft.graph.downloadUrl')
+        
+        if not download_url:
+            raise Exception("Download URL not available for this file")
+        
+        # Download the file content
+        # Note: The download URL is pre-authenticated, no need to add Authorization header
+        response = requests.get(download_url)
+        response.raise_for_status()
+        
+        return response.content
 

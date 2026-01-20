@@ -23,6 +23,7 @@ def parse_amount_from_filename(filename):
     Examples:
         - "Randy, Azure, 48.21.pdf" -> 48.21
         - "Randy, Azure, 36.pdf" -> 36.00
+        - "Evan, 3D Experience, $48.00.pdf" -> 48.00
         - "Invalid Name.pdf" -> None
 
     Args:
@@ -45,6 +46,10 @@ def parse_amount_from_filename(filename):
 
         # Get the last part and strip whitespace
         amount_str = parts[-1].strip()
+
+        # Remove currency symbols and common formatting characters
+        # Strip $, €, £, commas, and other common currency symbols
+        amount_str = amount_str.replace('$', '').replace('€', '').replace('£', '').replace(',', '').strip()
 
         # Try to parse as float
         amount = float(amount_str)

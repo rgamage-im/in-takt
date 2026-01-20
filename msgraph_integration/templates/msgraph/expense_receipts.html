@@ -108,10 +108,14 @@
     </div>
 
     <!-- Stats Cards -->
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
         <div class="bg-white rounded-lg shadow p-4 border-l-4" style="border-left-color: var(--color-warm-brick);">
             <div class="text-sm font-medium" style="color: var(--color-olive-gray);">Total Files</div>
             <div id="stat-total" class="text-2xl font-bold mt-1" style="color: var(--color-deep-navy);">-</div>
+        </div>
+        <div class="bg-white rounded-lg shadow p-4 border-l-4" style="border-left-color: #48BB78;">
+            <div class="text-sm font-medium" style="color: var(--color-olive-gray);">Total Amount</div>
+            <div id="stat-amount" class="text-2xl font-bold mt-1" style="color: var(--color-deep-navy);">-</div>
         </div>
         <div class="bg-white rounded-lg shadow p-4 border-l-4" style="border-left-color: var(--color-soft-sky-blue);">
             <div class="text-sm font-medium" style="color: var(--color-olive-gray);">Total Size</div>
@@ -173,6 +177,14 @@ document.addEventListener('DOMContentLoaded', function() {
         return (bytes / Math.pow(1024, i)).toFixed(2) + ' ' + sizes[i];
     };
 
+    // Currency formatter
+    var currencyFormatter = function(cell, formatterParams, onRendered){
+        var amount = cell.getValue();
+        if (amount === null || amount === undefined) return "-";
+
+        return '$' + parseFloat(amount).toFixed(2);
+    };
+
     // Filename with link formatter
     var filenameLinkFormatter = function(cell, formatterParams, onRendered){
         var rowData = cell.getRow().getData();
@@ -225,6 +237,15 @@ document.addEventListener('DOMContentLoaded', function() {
                 sorter: "string",
                 formatter: filenameLinkFormatter,
                 minWidth: 250,
+                headerFilter: "input"
+            },
+            {
+                title: "Amount",
+                field: "amount",
+                sorter: "number",
+                formatter: currencyFormatter,
+                width: 120,
+                hozAlign: "right",
                 headerFilter: "input"
             },
             {
@@ -291,6 +312,23 @@ document.addEventListener('DOMContentLoaded', function() {
         // Total files
         var totalFiles = response.totalFiles || response.value.length || 0;
         document.getElementById('stat-total').textContent = totalFiles;
+
+        // Total amount
+        var totalAmount = 0;
+        var parsedCount = 0;
+        response.value.forEach(function(file) {
+            if (file.amount !== null && file.amount !== undefined) {
+                totalAmount += file.amount;
+                parsedCount++;
+            }
+        });
+
+        // Format total amount
+        if (parsedCount > 0) {
+            document.getElementById('stat-amount').textContent = '$' + totalAmount.toFixed(2);
+        } else {
+            document.getElementById('stat-amount').textContent = '-';
+        }
 
         // Total size
         var totalSize = 0;

@@ -2,6 +2,7 @@
 Microsoft Graph API Views - Delegated Permissions
 Uses tokens from authenticated user session
 """
+import re
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
@@ -12,6 +13,50 @@ from django.http import HttpResponse
 
 from .services_delegated import GraphServiceDelegated
 from .serializers import UserProfileSerializer
+
+
+def parse_amount_from_filename(filename):
+    """
+    Parse transaction amount from expense receipt filename.
+
+    Expected format: "Name, Description, Amount.extension"
+    Examples:
+        - "Randy, Azure, 48.21.pdf" -> 48.21
+        - "Randy, Azure, 36.pdf" -> 36.00
+        - "Invalid Name.pdf" -> None
+
+    Args:
+        filename: The file name to parse
+
+    Returns:
+        float: The parsed amount, or None if parsing fails
+    """
+    if not filename:
+        return None
+
+    try:
+        # Remove file extension
+        name_without_ext = filename.rsplit('.', 1)[0] if '.' in filename else filename
+
+        # Split by comma and get the last part
+        parts = name_without_ext.split(',')
+        if len(parts) < 2:
+            return None
+
+        # Get the last part and strip whitespace
+        amount_str = parts[-1].strip()
+
+        # Try to parse as float
+        amount = float(amount_str)
+
+        # Validate it's a reasonable amount (non-negative)
+        if amount < 0:
+            return None
+
+        return amount
+
+    except (ValueError, AttributeError, IndexError):
+        return None
 
 
 class MyProfileAPIView(APIView):
@@ -787,22 +832,22 @@ class ExpenseReceiptsAPIView(APIView):
     )
     def get(self, request):
         """
-        List expense receipt files
+        List expense receipt files with parsed transaction amounts
         """
         access_token = request.session.get('graph_access_token')
-        
+
         if not access_token:
             return Response(
                 {'error': 'Not authenticated with Microsoft', 'login_url': '/graph/login/'},
                 status=status.HTTP_401_UNAUTHORIZED
             )
-        
+
         try:
             folder_id = request.query_params.get('folder_id')
             drive_id = request.query_params.get('drive_id')
-            
+
             graph_service = GraphServiceDelegated()
-            
+
             # Call with custom IDs if provided, otherwise use defaults
             if folder_id and drive_id:
                 receipts = graph_service.get_expense_receipts(access_token, folder_id, drive_id)
@@ -812,9 +857,15 @@ class ExpenseReceiptsAPIView(APIView):
                 receipts = graph_service.get_expense_receipts(access_token, drive_id=drive_id)
             else:
                 receipts = graph_service.get_expense_receipts(access_token)
-            
+
+            # Parse transaction amounts from filenames for all files in one pass
+            if 'value' in receipts and isinstance(receipts['value'], list):
+                for file in receipts['value']:
+                    filename = file.get('name', '')
+                    file['amount'] = parse_amount_from_filename(filename)
+
             return Response(receipts, status=status.HTTP_200_OK)
-            
+
         except Exception as e:
             return Response(
                 {'error': str(e)},

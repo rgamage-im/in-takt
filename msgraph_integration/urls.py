@@ -3,12 +3,13 @@ Microsoft Graph Integration URLs
 """
 from django.urls import path
 from .auth_views import (
-    GraphLoginView, 
-    GraphCallbackView, 
-    GraphLogoutView, 
-    MyProfilePageView, 
+    GraphLoginView,
+    GraphCallbackView,
+    GraphLogoutView,
+    MyProfilePageView,
     GraphExploreView,
-    TeamsMessagesTableView
+    TeamsMessagesTableView,
+    ExpenseReceiptsTableView
 )
 from .api_views import (
     MyProfileAPIView, 
@@ -44,7 +45,10 @@ urlpatterns = [
     
     # Teams Messages Table (HTML)
     path('teams/messages/', TeamsMessagesTableView.as_view(), name='teams-messages-table'),
-    
+
+    # Expense Receipts Table (HTML)
+    path('receipts/expense/', ExpenseReceiptsTableView.as_view(), name='expense-receipts-table'),
+
     # API Routes - Delegated Permissions (uses session token)
     path('api/me/', MyProfileAPIView.as_view(), name='api-my-profile'),
     path('api/me/messages/', MyMessagesAPIView.as_view(), name='api-my-messages'),

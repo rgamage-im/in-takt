@@ -154,19 +154,42 @@ class TeamsMessagesTableView(View):
     Display Teams channel messages in a table view using Tabulator
     Requires Django authentication + MS Graph OAuth
     """
-    
+
     def get(self, request):
         """
         Show Teams messages table page
         """
         # Check if user is authenticated with Microsoft Graph
         access_token = request.session.get('graph_access_token')
-        
+
         if not access_token:
             # Store intended destination and redirect to login
             request.session['graph_next'] = 'msgraph:teams-messages-table'
             return redirect('msgraph:graph-login')
-        
+
         # Render the template - Tabulator will fetch data via AJAX
         return render(request, 'msgraph/teams_messages.html')
+
+
+@method_decorator(login_required, name='dispatch')
+class ExpenseReceiptsTableView(View):
+    """
+    Display expense receipt files in a table view using Tabulator
+    Requires Django authentication + MS Graph OAuth
+    """
+
+    def get(self, request):
+        """
+        Show expense receipts table page
+        """
+        # Check if user is authenticated with Microsoft Graph
+        access_token = request.session.get('graph_access_token')
+
+        if not access_token:
+            # Store intended destination and redirect to login
+            request.session['graph_next'] = 'msgraph:expense-receipts-table'
+            return redirect('msgraph:graph-login')
+
+        # Render the template - Tabulator will fetch data via AJAX
+        return render(request, 'msgraph/expense_receipts.html')
 

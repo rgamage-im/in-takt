@@ -3,6 +3,7 @@ Microsoft Graph API Views - Delegated Permissions
 Uses tokens from authenticated user session
 """
 import re
+from typing import List, Dict, Any
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
@@ -62,6 +63,51 @@ def parse_amount_from_filename(filename):
 
     except (ValueError, AttributeError, IndexError):
         return None
+
+
+def match_receipts_with_qb_transactions(receipts: List[Dict[str, Any]], qb_expenses: List[Dict[str, Any]]) -> None:
+    """
+    Match expense receipts with QuickBooks transactions by amount.
+    Modifies receipts in-place to add 'qb_match_status' field.
+
+    Match statuses:
+        - 'none': No matching QB transaction found
+        - 'single': Exactly one matching QB transaction found
+        - 'multiple': Multiple matching QB transactions found
+
+    Args:
+        receipts: List of receipt file dictionaries with 'amount' field
+        qb_expenses: List of QuickBooks Purchase transactions with 'TotalAmt' field
+    """
+    # Build a map of amounts to QB transaction counts
+    amount_counts = {}
+    for expense in qb_expenses:
+        try:
+            amount = float(expense.get('TotalAmt', 0))
+            if amount > 0:
+                amount_counts[amount] = amount_counts.get(amount, 0) + 1
+        except (ValueError, TypeError):
+            continue
+
+    # Match each receipt with QB transactions
+    for receipt in receipts:
+        receipt_amount = receipt.get('amount')
+
+        if receipt_amount is None or receipt_amount <= 0:
+            receipt['qb_match_status'] = 'none'
+            receipt['qb_match_count'] = 0
+            continue
+
+        match_count = amount_counts.get(receipt_amount, 0)
+
+        if match_count == 0:
+            receipt['qb_match_status'] = 'none'
+        elif match_count == 1:
+            receipt['qb_match_status'] = 'single'
+        else:
+            receipt['qb_match_status'] = 'multiple'
+
+        receipt['qb_match_count'] = match_count
 
 
 class MyProfileAPIView(APIView):
@@ -837,7 +883,7 @@ class ExpenseReceiptsAPIView(APIView):
     )
     def get(self, request):
         """
-        List expense receipt files with parsed transaction amounts
+        List expense receipt files with parsed transaction amounts and QuickBooks matching
         """
         access_token = request.session.get('graph_access_token')
 
@@ -868,6 +914,33 @@ class ExpenseReceiptsAPIView(APIView):
                 for file in receipts['value']:
                     filename = file.get('name', '')
                     file['amount'] = parse_amount_from_filename(filename)
+
+                # Try to match with QuickBooks transactions if user is authenticated
+                qb_access_token = request.session.get('qb_access_token')
+                qb_realm_id = request.session.get('qb_realm_id')
+
+                if qb_access_token and qb_realm_id:
+                    try:
+                        # Import here to avoid circular dependency issues
+                        from quickbooks_integration.services import QuickBooksService
+
+                        qb_service = QuickBooksService()
+                        # Fetch recent expenses (last 100)
+                        qb_response = qb_service.list_expenses(qb_access_token, qb_realm_id, max_results=100)
+                        qb_expenses = qb_response.get('QueryResponse', {}).get('Purchase', [])
+
+                        # Match receipts with QB transactions
+                        match_receipts_with_qb_transactions(receipts['value'], qb_expenses)
+                    except Exception as qb_error:
+                        # If QB matching fails, continue without matching (set all to 'none')
+                        for file in receipts['value']:
+                            file['qb_match_status'] = 'none'
+                            file['qb_match_count'] = 0
+                else:
+                    # User not authenticated with QuickBooks, set all matches to 'none'
+                    for file in receipts['value']:
+                        file['qb_match_status'] = 'none'
+                        file['qb_match_count'] = 0
 
             return Response(receipts, status=status.HTTP_200_OK)
 

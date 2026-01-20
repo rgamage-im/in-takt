@@ -153,6 +153,22 @@
 // Initialize Tabulator when page loads
 document.addEventListener('DOMContentLoaded', function() {
 
+    // Get CSRF token for POST requests
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
+
     // Date/time formatter
     var dateTimeFormatter = function(cell, formatterParams, onRendered){
         var value = cell.getValue();
@@ -192,10 +208,15 @@ document.addEventListener('DOMContentLoaded', function() {
         var matchCount = rowData.qb_match_count || 0;
 
         if (matchStatus === 'single') {
-            // Green checkmark for single match
-            return '<svg class="w-6 h-6 mx-auto" style="color: #48BB78;" fill="currentColor" viewBox="0 0 20 20">' +
-                   '<path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>' +
-                   '</svg>';
+            // Upload button for single match
+            return '<button class="upload-btn px-3 py-1 rounded text-white text-sm font-medium hover:opacity-90" ' +
+                   'style="background-color: var(--color-warm-brick);" ' +
+                   'data-file-id="' + rowData.id + '" ' +
+                   'data-drive-id="' + rowData.driveId + '" ' +
+                   'data-transaction-id="' + rowData.qb_transaction_id + '" ' +
+                   'data-file-name="' + rowData.name + '" ' +
+                   'data-mime-type="' + rowData.mimeType + '">' +
+                   'Upload</button>';
         } else if (matchStatus === 'multiple') {
             // Yellow warning for multiple matches
             var tooltip = matchCount + ' matching transactions found';
@@ -389,6 +410,73 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         document.getElementById('stat-location').textContent = location;
     }
+
+    // Handle upload button clicks
+    document.addEventListener('click', function(e) {
+        if (e.target && e.target.classList.contains('upload-btn')) {
+            e.stopPropagation(); // Prevent row click event
+
+            const button = e.target;
+            const fileId = button.dataset.fileId;
+            const driveId = button.dataset.driveId;
+            const transactionId = button.dataset.transactionId;
+            const fileName = button.dataset.fileName;
+            const mimeType = button.dataset.mimeType;
+
+            // Disable button and show loading state
+            const originalText = button.textContent;
+            button.disabled = true;
+            button.textContent = 'Uploading...';
+            button.style.opacity = '0.6';
+
+            // Call the upload API
+            fetch('/graph/api/receipts/upload-to-quickbooks/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCookie('csrftoken')
+                },
+                body: JSON.stringify({
+                    file_id: fileId,
+                    drive_id: driveId,
+                    transaction_id: transactionId,
+                    file_name: fileName,
+                    mime_type: mimeType
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Show success state
+                    button.textContent = '✓ Uploaded';
+                    button.style.backgroundColor = '#48BB78'; // Green
+                    button.style.opacity = '1';
+
+                    // Show success message
+                    alert('Success! Receipt uploaded and attached to QuickBooks transaction.');
+                } else {
+                    // Log full error data to console
+                    console.error('Upload failed - Full error data:', data);
+
+                    if (data.debug_response) {
+                        console.log('QuickBooks API Response:', data.debug_response);
+                    }
+
+                    let errorMsg = data.error || 'Upload failed';
+                    throw new Error(errorMsg);
+                }
+            })
+            .catch(error => {
+                // Restore button and show error
+                button.disabled = false;
+                button.textContent = originalText;
+                button.style.opacity = '1';
+
+                alert('Error uploading receipt: ' + error.message);
+                console.error('Upload error:', error);
+            });
+        }
+    });
 });
 </script>
 {% endblock %}

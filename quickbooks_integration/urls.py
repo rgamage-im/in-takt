@@ -21,6 +21,7 @@ from .api_views import (
     QuickBooksBalanceSheetAPIView,
     QuickBooksUploadReceiptAPIView,
     QuickBooksAttachReceiptAPIView,
+    QuickBooksDebugInfoAPIView,
 )
 
 app_name = 'quickbooks'
@@ -51,4 +52,7 @@ urlpatterns = [
     # Reports API
     path('api/reports/profit-loss/', QuickBooksProfitLossAPIView.as_view(), name='api-profit-loss'),
     path('api/reports/balance-sheet/', QuickBooksBalanceSheetAPIView.as_view(), name='api-balance-sheet'),
+
+    # Debug API
+    path('api/debug-info/', QuickBooksDebugInfoAPIView.as_view(), name='api-debug-info'),
 ]

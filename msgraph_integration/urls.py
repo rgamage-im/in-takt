@@ -12,8 +12,8 @@ from .auth_views import (
     ExpenseReceiptsTableView
 )
 from .api_views import (
-    MyProfileAPIView, 
-    MyMessagesAPIView, 
+    MyProfileAPIView,
+    MyMessagesAPIView,
     MyCalendarAPIView,
     MyTeamsAPIView,
     MyTeamsChannelMessagesAPIView,
@@ -26,7 +26,8 @@ from .api_views import (
     AllAccessibleDrivesAPIView,
     SearchAllDrivesIncludingSharePointAPIView,
     ExpenseReceiptsAPIView,
-    DownloadFileAPIView
+    DownloadFileAPIView,
+    UploadReceiptToQuickBooksAPIView
 )
 
 app_name = 'msgraph'
@@ -71,4 +72,5 @@ urlpatterns = [
     
     # Expense Receipts API
     path('api/receipts/expense/', ExpenseReceiptsAPIView.as_view(), name='api-expense-receipts'),
+    path('api/receipts/upload-to-quickbooks/', UploadReceiptToQuickBooksAPIView.as_view(), name='api-upload-receipt-to-qb'),
 ]

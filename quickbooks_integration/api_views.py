@@ -523,11 +523,100 @@ class QuickBooksAttachReceiptAPIView(APIView):
                 transaction_id,
                 note
             )
-            
+
             return Response(result, status=status.HTTP_200_OK)
-        
+
         except Exception as e:
             return Response(
                 {'error': str(e)},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
+
+
+class QuickBooksDebugInfoAPIView(APIView):
+    """
+    Get debug info for testing QuickBooks API with Postman/curl
+    """
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(
+        summary="Get QuickBooks Debug Info",
+        description="""
+        Returns access token, realm ID, and sample curl commands for testing
+        the QuickBooks API directly with Postman or curl.
+
+        **Use this to debug upload/attach receipt issues outside of Django.**
+        """,
+        responses={200: dict, 401: dict},
+        tags=['QuickBooks Debug']
+    )
+    def get(self, request):
+        access_token = request.session.get('qb_access_token')
+        realm_id = request.session.get('qb_realm_id')
+
+        if not access_token or not realm_id:
+            return Response(
+                {
+                    'error': 'Not authenticated with QuickBooks',
+                    'login_url': '/quickbooks/login/'
+                },
+                status=status.HTTP_401_UNAUTHORIZED
+            )
+
+        qb_service = QuickBooksService()
+        environment = qb_service.environment
+        api_base_url = qb_service.api_base_url
+
+        # Sample curl commands for testing
+        sample_commands = {
+            "1_upload_receipt": f"""curl -X POST '{api_base_url}/company/{realm_id}/upload' \\
+  -H 'Authorization: Bearer {access_token}' \\
+  -H 'Accept: application/json' \\
+  -F 'file_metadata_01={{"FileName":"test-receipt.jpg","ContentType":"image/jpeg"}}' \\
+  -F 'file_content_01=@/path/to/your/receipt.jpg;type=image/jpeg'""",
+
+            "2_get_attachable": f"""curl -X GET '{api_base_url}/company/{realm_id}/attachable/YOUR_ATTACHABLE_ID' \\
+  -H 'Authorization: Bearer {access_token}' \\
+  -H 'Accept: application/json'""",
+
+            "3_update_attachable": f"""curl -X POST '{api_base_url}/company/{realm_id}/attachable' \\
+  -H 'Authorization: Bearer {access_token}' \\
+  -H 'Accept: application/json' \\
+  -H 'Content-Type: application/json' \\
+  -d '{{
+    "Attachable": {{
+      "Id": "YOUR_ATTACHABLE_ID",
+      "SyncToken": "SYNC_TOKEN_FROM_GET",
+      "FileName": "test-receipt.jpg",
+      "Note": "Test attachment",
+      "AttachableRef": [{{
+        "EntityRef": {{
+          "type": "Purchase",
+          "value": "YOUR_TRANSACTION_ID"
+        }}
+      }}]
+    }}
+  }}'""",
+
+            "4_get_purchase": f"""curl -X GET '{api_base_url}/company/{realm_id}/purchase/YOUR_TRANSACTION_ID' \\
+  -H 'Authorization: Bearer {access_token}' \\
+  -H 'Accept: application/json'"""
+        }
+
+        return Response({
+            'access_token': access_token,
+            'realm_id': realm_id,
+            'environment': environment,
+            'api_base_url': api_base_url,
+            'sample_curl_commands': sample_commands,
+            'postman_tips': {
+                'base_url': api_base_url,
+                'auth_header': f'Bearer {access_token}',
+                'steps': [
+                    '1. Upload receipt using multipart/form-data',
+                    '2. Get the attachable ID from response',
+                    '3. GET the attachable to see its current state',
+                    '4. POST update with AttachableRef to attach to transaction'
+                ]
+            }
+        }, status=status.HTTP_200_OK)

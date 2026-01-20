@@ -68,24 +68,26 @@ def parse_amount_from_filename(filename):
 def match_receipts_with_qb_transactions(receipts: List[Dict[str, Any]], qb_expenses: List[Dict[str, Any]]) -> None:
     """
     Match expense receipts with QuickBooks transactions by amount.
-    Modifies receipts in-place to add 'qb_match_status' field.
+    Modifies receipts in-place to add 'qb_match_status' and 'qb_transaction_id' fields.
 
     Match statuses:
         - 'none': No matching QB transaction found
-        - 'single': Exactly one matching QB transaction found
+        - 'single': Exactly one matching QB transaction found (stores transaction ID)
         - 'multiple': Multiple matching QB transactions found
 
     Args:
         receipts: List of receipt file dictionaries with 'amount' field
-        qb_expenses: List of QuickBooks Purchase transactions with 'TotalAmt' field
+        qb_expenses: List of QuickBooks Purchase transactions with 'TotalAmt' and 'Id' fields
     """
-    # Build a map of amounts to QB transaction counts
-    amount_counts = {}
+    # Build a map of amounts to QB transactions
+    amount_to_transactions = {}
     for expense in qb_expenses:
         try:
             amount = float(expense.get('TotalAmt', 0))
             if amount > 0:
-                amount_counts[amount] = amount_counts.get(amount, 0) + 1
+                if amount not in amount_to_transactions:
+                    amount_to_transactions[amount] = []
+                amount_to_transactions[amount].append(expense)
         except (ValueError, TypeError):
             continue
 
@@ -96,16 +98,21 @@ def match_receipts_with_qb_transactions(receipts: List[Dict[str, Any]], qb_expen
         if receipt_amount is None or receipt_amount <= 0:
             receipt['qb_match_status'] = 'none'
             receipt['qb_match_count'] = 0
+            receipt['qb_transaction_id'] = None
             continue
 
-        match_count = amount_counts.get(receipt_amount, 0)
+        matching_transactions = amount_to_transactions.get(receipt_amount, [])
+        match_count = len(matching_transactions)
 
         if match_count == 0:
             receipt['qb_match_status'] = 'none'
+            receipt['qb_transaction_id'] = None
         elif match_count == 1:
             receipt['qb_match_status'] = 'single'
+            receipt['qb_transaction_id'] = matching_transactions[0].get('Id')
         else:
             receipt['qb_match_status'] = 'multiple'
+            receipt['qb_transaction_id'] = None
 
         receipt['qb_match_count'] = match_count
 
@@ -1054,10 +1061,145 @@ class DownloadFileAPIView(APIView):
                     {'error': 'File not found', 'details': error_message},
                     status=status.HTTP_404_NOT_FOUND
                 )
-            
+
             return Response(
                 {'error': str(e)},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
+
+class UploadReceiptToQuickBooksAPIView(APIView):
+    """
+    Upload an expense receipt from SharePoint to QuickBooks and attach to a transaction
+    """
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(
+        summary="Upload Receipt from SharePoint to QuickBooks",
+        description="""
+        Downloads an expense receipt file from SharePoint and uploads it to QuickBooks,
+        attaching it to the specified Purchase transaction in a SINGLE API call.
+
+        The upload includes the AttachableRef in the file metadata, which attaches
+        the receipt to the transaction during upload (not in a separate step).
+
+        Request body (JSON):
+        - `file_id`: SharePoint file item ID (required)
+        - `drive_id`: SharePoint drive ID (required)
+        - `transaction_id`: QuickBooks Purchase transaction ID from matching (required)
+        - `file_name`: File name for the attachment (required)
+        - `mime_type`: MIME type of the file (required)
+        
+        Note: The transaction_id should come from the qb_transaction_id field returned
+        by the GET /graph/api/receipts/expense/ endpoint during matching.
+        """,
+        request={
+            'application/json': {
+                'type': 'object',
+                'properties': {
+                    'file_id': {'type': 'string', 'description': 'SharePoint file item ID'},
+                    'drive_id': {'type': 'string', 'description': 'SharePoint drive ID'},
+                    'transaction_id': {'type': 'string', 'description': 'QuickBooks transaction ID'},
+                    'file_name': {'type': 'string', 'description': 'File name'},
+                    'mime_type': {'type': 'string', 'description': 'MIME type'},
+                },
+                'required': ['file_id', 'drive_id', 'transaction_id', 'file_name', 'mime_type']
+            }
+        },
+        responses={
+            200: {'description': 'Receipt uploaded and attached successfully'},
+            400: {'description': 'Missing required parameters'},
+            401: {'description': 'Not authenticated'},
+            500: {'description': 'Server error'}
+        },
+        tags=['Microsoft Graph - Receipts']
+    )
+    def post(self, request):
+        """
+        Upload receipt from SharePoint to QuickBooks
+        """
+        # Check authentication for both services
+        graph_token = request.session.get('graph_access_token')
+        qb_token = request.session.get('qb_access_token')
+        qb_realm_id = request.session.get('qb_realm_id')
+
+        if not graph_token:
+            return Response(
+                {'error': 'Not authenticated with Microsoft', 'login_url': '/graph/login/'},
+                status=status.HTTP_401_UNAUTHORIZED
+            )
+
+        if not qb_token or not qb_realm_id:
+            return Response(
+                {'error': 'Not authenticated with QuickBooks', 'login_url': '/quickbooks/login/'},
+                status=status.HTTP_401_UNAUTHORIZED
+            )
+
+        # Extract parameters
+        file_id = request.data.get('file_id')
+        drive_id = request.data.get('drive_id')
+        transaction_id = request.data.get('transaction_id')
+        file_name = request.data.get('file_name')
+        mime_type = request.data.get('mime_type')
+
+        if not all([file_id, drive_id, transaction_id, file_name, mime_type]):
+            return Response(
+                {'error': 'Missing required parameters: file_id, drive_id, transaction_id, file_name, mime_type'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            # Step 1: Download file from SharePoint
+            graph_service = GraphServiceDelegated()
+            file_content = graph_service.download_file(graph_token, file_id, drive_id)
+
+            # Step 2: Upload to QuickBooks WITH transaction reference in ONE call
+            from quickbooks_integration.services import QuickBooksService
+            qb_service = QuickBooksService()
+
+            # Upload and attach in a single API call using AttachableRef in metadata
+            upload_response = qb_service.upload_receipt(
+                access_token=qb_token,
+                realm_id=qb_realm_id,
+                file_content=file_content,
+                file_name=file_name,
+                content_type=mime_type,
+                transaction_type='Purchase',
+                transaction_id=transaction_id,
+                note=f'Uploaded from SharePoint: {file_name}'
+            )
+
+            # Debug: Log the full response
+            import json
+            print(f"DEBUG: QuickBooks upload response: {json.dumps(upload_response, indent=2)}")
+
+            # Extract attachable ID - handle different response structures
+            attachable_id = None
+            if 'AttachableResponse' in upload_response:
+                attachable_list = upload_response['AttachableResponse']
+                if isinstance(attachable_list, list) and len(attachable_list) > 0:
+                    attachable_id = attachable_list[0].get('Attachable', {}).get('Id')
+            elif 'Attachable' in upload_response:
+                attachable_id = upload_response['Attachable'].get('Id')
+
+            if not attachable_id:
+                # Return the actual response for debugging
+                return Response({
+                    'error': 'Upload response did not contain attachable ID',
+                    'debug_response': upload_response,
+                    'help': 'The QuickBooks API returned an unexpected response structure'
+                }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+            return Response({
+                'success': True,
+                'message': f'Receipt "{file_name}" uploaded and attached to QuickBooks transaction in one call',
+                'attachable_id': attachable_id,
+                'transaction_id': transaction_id
+            }, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            return Response(
+                {'error': f'Failed to upload receipt: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 

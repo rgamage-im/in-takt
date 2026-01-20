@@ -365,41 +365,63 @@ class QuickBooksService:
         realm_id: str,
         file_content: bytes,
         file_name: str,
-        content_type: str = 'image/jpeg'
+        content_type: str = 'image/jpeg',
+        transaction_type: str = None,
+        transaction_id: str = None,
+        note: str = None
     ) -> Dict[str, Any]:
         """
-        Upload a receipt file to QuickBooks
-        
+        Upload a receipt file to QuickBooks and optionally attach to a transaction
+
         Args:
             access_token: OAuth access token
             realm_id: QuickBooks company ID
             file_content: Binary file content
             file_name: Name of the file (e.g., 'receipt.jpg')
             content_type: MIME type (e.g., 'image/jpeg', 'application/pdf')
-            
+            transaction_type: Optional - Type of transaction to attach to ('Purchase', etc.)
+            transaction_id: Optional - ID of the transaction to attach to
+            note: Optional - Note for the attachment
+
         Returns:
-            Attachable object with ID to link to transactions
+            Attachable object with ID
         """
         url = f"{self.api_base_url}/company/{realm_id}/upload"
-        
+
         headers = {
             'Authorization': f'Bearer {access_token}',
             'Accept': 'application/json',
         }
-        
-        # Prepare multipart form data
+
+        # Prepare multipart form data - QuickBooks expects specific field names
+        import json
+
+        # Create the metadata JSON - include AttachableRef if transaction provided
+        metadata = {
+            "FileName": file_name,
+            "ContentType": content_type
+        }
+
+        # Add transaction reference if provided (attaches during upload)
+        if transaction_type and transaction_id:
+            metadata["AttachableRef"] = [{
+                "EntityRef": {
+                    "type": transaction_type,
+                    "value": str(transaction_id)
+                }
+            }]
+
+        if note:
+            metadata["Note"] = note
+
         files = {
+            'file_metadata_01': (None, json.dumps(metadata), 'application/json'),
             'file_content_01': (file_name, file_content, content_type)
         }
-        
-        # Include metadata as a separate form field
-        data = {
-            'file_metadata_01': f'{{"FileName":"{file_name}","ContentType":"{content_type}"}}'
-        }
-        
-        response = requests.post(url, headers=headers, files=files, data=data)
+
+        response = requests.post(url, headers=headers, files=files)
         response.raise_for_status()
-        
+
         return response.json()
     
     def attach_receipt_to_transaction(
@@ -413,7 +435,7 @@ class QuickBooksService:
     ) -> Dict[str, Any]:
         """
         Attach an uploaded receipt to a transaction
-        
+
         Args:
             access_token: OAuth access token
             realm_id: QuickBooks company ID
@@ -421,45 +443,82 @@ class QuickBooksService:
             transaction_type: Type of transaction ('Purchase', 'Bill', 'Invoice', etc.)
             transaction_id: ID of the transaction
             note: Optional note about the attachment
-            
+
         Returns:
             Updated attachable object
         """
-        url = f"{self.api_base_url}/company/{realm_id}/attachable/{attachable_id}"
-        
+        # Get the current attachable first
+        get_url = f"{self.api_base_url}/company/{realm_id}/attachable/{attachable_id}"
         headers = {
             'Authorization': f'Bearer {access_token}',
             'Accept': 'application/json',
             'Content-Type': 'application/json',
         }
-        
-        # Get the current attachable first to update it
-        get_response = requests.get(url, headers=headers)
+
+        get_response = requests.get(get_url, headers=headers)
         get_response.raise_for_status()
         attachable = get_response.json().get('Attachable', {})
-        
-        # Add the entity reference
-        if 'AttachableRef' not in attachable:
+
+        # Add the entity reference (check if it already exists)
+        if 'AttachableRef' not in attachable or not isinstance(attachable['AttachableRef'], list):
             attachable['AttachableRef'] = []
-        
-        attachable['AttachableRef'].append({
-            'EntityRef': {
-                'type': transaction_type,
-                'value': transaction_id
-            }
-        })
-        
+
+        # Check if this transaction is already attached
+        existing_ref = next(
+            (ref for ref in attachable['AttachableRef']
+             if ref.get('EntityRef', {}).get('value') == transaction_id),
+            None
+        )
+
+        if not existing_ref:
+            attachable['AttachableRef'].append({
+                'EntityRef': {
+                    'type': transaction_type,
+                    'value': transaction_id
+                }
+            })
+
+        # Always add a note - QuickBooks requires either a note or file attachment
+        # Since we have a file, we should already be good, but let's add a note too
         if note:
             attachable['Note'] = note
-        
-        # Update the attachable
-        update_data = {
-            'Attachable': attachable
+        elif 'Note' not in attachable or not attachable['Note']:
+            attachable['Note'] = f'Attached to {transaction_type} {transaction_id}'
+
+        # For updates, we need to send back the FULL attachable object
+        # but exclude read-only fields that QB returns but doesn't accept in updates
+        # Keep all fields EXCEPT the metadata fields that QB auto-generates
+        exclude_fields = {'MetaData', 'FileAccessUri', 'TempDownloadUri', 'domain', 'sparse'}
+
+        update_attachable = {
+            key: value for key, value in attachable.items()
+            if key not in exclude_fields
         }
-        
-        response = requests.post(url, headers=headers, json=update_data)
+
+        # Update the attachable - use POST with minimal required fields
+        update_url = f"{self.api_base_url}/company/{realm_id}/attachable"
+        update_data = {
+            'Attachable': update_attachable
+        }
+
+        # Debug: Log the request data
+        import json
+        print(f"DEBUG: Updating attachable with data: {json.dumps(update_data, indent=2)}")
+
+        response = requests.post(update_url, headers=headers, json=update_data)
+
+        # If error, capture the response body for debugging
+        if not response.ok:
+            error_detail = response.text
+            try:
+                error_json = response.json()
+                error_detail = error_json
+            except:
+                pass
+            raise ValueError(f"QuickBooks API error: {response.status_code} - {error_detail}")
+
         response.raise_for_status()
-        
+
         return response.json()
     
     def upload_and_attach_receipt(

@@ -55,6 +55,7 @@ INSTALLED_APPS = [
     "msgraph_integration",
     "quickbooks_integration",
     "notion_integration",
+    "search_integration",
     # Third-party apps
     "rest_framework",
     "drf_spectacular",
@@ -301,3 +302,7 @@ LOGGING = {
         },
     },
 }
+
+# RAG Search API Configuration
+RAG_API_BASE_URL = os.getenv('RAG_API_BASE_URL', 'http://localhost:8000')
+RAG_API_KEY = os.getenv('RAG_API_KEY', 'placeholder-api-key-change-in-production')

@@ -43,6 +43,9 @@ urlpatterns = [
     # Notion integration
     path("notion/", include("notion_integration.urls")),
     
+    # RAG Search integration
+    path("search/", include("search_integration.urls")),
+    
     # API endpoints
     path("api/", include("api.urls")),
 ]

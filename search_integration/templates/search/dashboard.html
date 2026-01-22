@@ -1,0 +1,175 @@
+{% extends 'base.html' %}
+
+{% block title %}RAG Search Dashboard - In-Takt{% endblock %}
+
+{% block extra_css %}
+<style>
+    .status-card {
+        transition: all 0.3s ease;
+    }
+    
+    .status-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    }
+    
+    .badge-healthy {
+        background-color: #10b981;
+        color: white;
+    }
+    
+    .badge-degraded {
+        background-color: #f59e0b;
+        color: white;
+    }
+    
+    .badge-unhealthy, .badge-not_ready {
+        background-color: #ef4444;
+        color: white;
+    }
+    
+    .badge-ready {
+        background-color: #10b981;
+        color: white;
+    }
+    
+    .badge-green {
+        background-color: #10b981;
+        color: white;
+    }
+    
+    .badge-yellow {
+        background-color: #f59e0b;
+        color: white;
+    }
+    
+    .badge-red {
+        background-color: #ef4444;
+        color: white;
+    }
+    
+    .badge-error {
+        background-color: #6b7280;
+        color: white;
+    }
+    
+    .pulse-animation {
+        animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+    }
+    
+    @keyframes pulse {
+        0%, 100% {
+            opacity: 1;
+        }
+        50% {
+            opacity: 0.5;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="px-4 py-6 sm:px-0">
+    <!-- Header -->
+    <div class="mb-6">
+        <div class="flex items-center justify-between">
+            <div>
+                <h1 class="text-3xl font-bold" style="color: var(--color-deep-navy);">
+                    RAG Search Dashboard
+                </h1>
+                <p class="mt-2 text-sm" style="color: var(--color-olive-gray);">
+                    Retrieval-Augmented Generation Search & Document Management
+                </p>
+            </div>
+            <div class="flex gap-3">
+                <button
+                    hx-get="{% url 'search:health_status' %}"
+                    hx-target="#health-status-container"
+                    hx-indicator="#refresh-spinner"
+                    class="px-4 py-2 rounded-md text-white font-medium hover:opacity-90 transition-opacity flex items-center gap-2"
+                    style="background-color: var(--color-warm-brick);">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                    </svg>
+                    <span>Refresh Status</span>
+                    <span id="refresh-spinner" class="htmx-indicator pulse-animation">⟳</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- System Status Section -->
+    <div class="mb-8">
+        <h2 class="text-xl font-semibold mb-4" style="color: var(--color-deep-navy);">
+            System Status
+        </h2>
+        
+        <!-- Status Cards Container (will be updated via HTMX) -->
+        <div 
+            id="health-status-container"
+            hx-get="{% url 'search:health_status' %}"
+            hx-trigger="load, every 30s"
+            class="min-h-32">
+            <!-- Loading state -->
+            <div class="flex items-center justify-center py-12">
+                <div class="text-center">
+                    <div class="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900 mb-4"></div>
+                    <p class="text-gray-600">Loading status...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Actions Section -->
+    <div class="mb-8">
+        <h2 class="text-xl font-semibold mb-4" style="color: var(--color-deep-navy);">
+            Actions
+        </h2>
+        <div class="bg-white rounded-lg shadow p-6">
+            <div class="flex flex-wrap gap-4">
+                <button
+                    disabled
+                    class="px-6 py-3 rounded-md font-medium transition-opacity opacity-50 cursor-not-allowed"
+                    style="background-color: var(--color-soft-sky-blue); color: var(--color-deep-navy);">
+                    Ingest Document
+                    <span class="ml-2 text-xs">(Coming Soon)</span>
+                </button>
+                <button
+                    disabled
+                    class="px-6 py-3 rounded-md font-medium transition-opacity opacity-50 cursor-not-allowed"
+                    style="background-color: var(--color-soft-sky-blue); color: var(--color-deep-navy);">
+                    Delete Document
+                    <span class="ml-2 text-xs">(Coming Soon)</span>
+                </button>
+                <button
+                    disabled
+                    class="px-6 py-3 rounded-md font-medium transition-opacity opacity-50 cursor-not-allowed"
+                    style="background-color: var(--color-soft-sky-blue); color: var(--color-deep-navy);">
+                    Search Documents
+                    <span class="ml-2 text-xs">(Coming Soon)</span>
+                </button>
+            </div>
+            <p class="mt-4 text-sm" style="color: var(--color-olive-gray);">
+                Phase 1: System health monitoring active. Document management features coming in Phase 2.
+            </p>
+        </div>
+    </div>
+
+    <!-- Information Section -->
+    <div class="bg-blue-50 border-l-4 border-blue-400 p-4 rounded">
+        <div class="flex">
+            <div class="flex-shrink-0">
+                <svg class="h-5 w-5 text-blue-400" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"></path>
+                </svg>
+            </div>
+            <div class="ml-3">
+                <h3 class="text-sm font-medium text-blue-800">About RAG Search</h3>
+                <div class="mt-2 text-sm text-blue-700">
+                    <p>The RAG (Retrieval-Augmented Generation) Pipeline provides intelligent document search and management capabilities using hybrid vector and keyword search powered by OpenSearch and Azure OpenAI embeddings.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

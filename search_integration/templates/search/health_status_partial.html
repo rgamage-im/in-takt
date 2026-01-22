@@ -1,0 +1,174 @@
+{% if connected %}
+<!-- Success State: Connected to RAG API -->
+<div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+    <!-- Health Status Card -->
+    <div class="status-card bg-white rounded-lg shadow p-6">
+        <div class="flex items-center justify-between">
+            <div>
+                <p class="text-sm font-medium" style="color: var(--color-olive-gray);">Health Status</p>
+                <p class="mt-2 text-3xl font-bold" style="color: var(--color-deep-navy);">
+                    {% if health.status == 'healthy' %}
+                        ✓
+                    {% elif health.status == 'degraded' %}
+                        ⚠
+                    {% else %}
+                        ✗
+                    {% endif %}
+                </p>
+            </div>
+            <div>
+                <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium badge-{{ health.status }}">
+                    {{ health.status|upper }}
+                </span>
+            </div>
+        </div>
+        <div class="mt-4">
+            <p class="text-xs" style="color: var(--color-olive-gray);">
+                Last checked: {{ health.timestamp|default:"Just now" }}
+            </p>
+        </div>
+    </div>
+
+    <!-- Readiness Status Card -->
+    <div class="status-card bg-white rounded-lg shadow p-6">
+        <div class="flex items-center justify-between">
+            <div>
+                <p class="text-sm font-medium" style="color: var(--color-olive-gray);">Readiness</p>
+                <p class="mt-2 text-3xl font-bold" style="color: var(--color-deep-navy);">
+                    {% if readiness.status == 'ready' %}
+                        ✓
+                    {% else %}
+                        ✗
+                    {% endif %}
+                </p>
+            </div>
+            <div>
+                <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium badge-{{ readiness.status }}">
+                    {{ readiness.status|upper }}
+                </span>
+            </div>
+        </div>
+        <div class="mt-4">
+            <p class="text-xs" style="color: var(--color-olive-gray);">
+                System is {% if readiness.status == 'ready' %}ready{% else %}not ready{% endif %} for requests
+            </p>
+        </div>
+    </div>
+
+    <!-- OpenSearch Status Card -->
+    <div class="status-card bg-white rounded-lg shadow p-6">
+        <div class="flex items-center justify-between">
+            <div>
+                <p class="text-sm font-medium" style="color: var(--color-olive-gray);">OpenSearch Cluster</p>
+                <p class="mt-2 text-3xl font-bold" style="color: var(--color-deep-navy);">
+                    {% if health.services.opensearch.cluster_status == 'green' %}
+                        ✓
+                    {% elif health.services.opensearch.cluster_status == 'yellow' %}
+                        ⚠
+                    {% else %}
+                        ✗
+                    {% endif %}
+                </p>
+            </div>
+            <div>
+                <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium badge-{{ health.services.opensearch.cluster_status }}">
+                    {{ health.services.opensearch.cluster_status|upper }}
+                </span>
+            </div>
+        </div>
+        <div class="mt-4">
+            <p class="text-xs" style="color: var(--color-olive-gray);">
+                Vector database status
+            </p>
+        </div>
+    </div>
+</div>
+
+<!-- Connection Success Indicator -->
+<div class="mt-4 flex items-center text-sm text-green-600">
+    <svg class="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
+        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
+    </svg>
+    Connected to RAG API at {{ health.timestamp|default:"just now" }}
+</div>
+
+{% else %}
+<!-- Error State: Cannot Connect to RAG API -->
+<div class="bg-red-50 border-l-4 border-red-400 p-6 rounded-lg">
+    <div class="flex">
+        <div class="flex-shrink-0">
+            <svg class="h-6 w-6 text-red-400" fill="currentColor" viewBox="0 0 20 20">
+                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"></path>
+            </svg>
+        </div>
+        <div class="ml-3 flex-1">
+            <h3 class="text-sm font-medium text-red-800">
+                RAG API Connection Error
+            </h3>
+            <div class="mt-2 text-sm text-red-700">
+                <p><strong>Error:</strong> {{ error }}</p>
+                {% if error_type == 'connection' %}
+                    <p class="mt-2">
+                        <strong>Troubleshooting:</strong>
+                    </p>
+                    <ul class="list-disc list-inside mt-1">
+                        <li>Make sure the RAG API is running on localhost:8000</li>
+                        <li>Start it with: <code class="bg-red-100 px-2 py-1 rounded">docker-compose up -d</code></li>
+                        <li>Check if port 8000 is not blocked or in use by another service</li>
+                    </ul>
+                {% elif error_type == 'timeout' %}
+                    <p class="mt-2">The RAG API is taking too long to respond. It may be starting up or experiencing issues.</p>
+                {% elif error_type == 'http_error' %}
+                    <p class="mt-2">HTTP Status Code: <code class="bg-red-100 px-2 py-1 rounded">{{ status_code }}</code></p>
+                    <p class="mt-1">Check your API key configuration and RAG API logs for details.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Placeholder Status Cards (Disconnected State) -->
+<div class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6 opacity-50">
+    <div class="status-card bg-white rounded-lg shadow p-6">
+        <div class="flex items-center justify-between">
+            <div>
+                <p class="text-sm font-medium" style="color: var(--color-olive-gray);">Health Status</p>
+                <p class="mt-2 text-3xl font-bold" style="color: var(--color-deep-navy);">—</p>
+            </div>
+            <div>
+                <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium badge-error">
+                    OFFLINE
+                </span>
+            </div>
+        </div>
+    </div>
+    
+    <div class="status-card bg-white rounded-lg shadow p-6">
+        <div class="flex items-center justify-between">
+            <div>
+                <p class="text-sm font-medium" style="color: var(--color-olive-gray);">Readiness</p>
+                <p class="mt-2 text-3xl font-bold" style="color: var(--color-deep-navy);">—</p>
+            </div>
+            <div>
+                <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium badge-error">
+                    OFFLINE
+                </span>
+            </div>
+        </div>
+    </div>
+    
+    <div class="status-card bg-white rounded-lg shadow p-6">
+        <div class="flex items-center justify-between">
+            <div>
+                <p class="text-sm font-medium" style="color: var(--color-olive-gray);">OpenSearch Cluster</p>
+                <p class="mt-2 text-3xl font-bold" style="color: var(--color-deep-navy);">—</p>
+            </div>
+            <div>
+                <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium badge-error">
+                    OFFLINE
+                </span>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}

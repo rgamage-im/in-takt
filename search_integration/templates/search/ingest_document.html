@@ -1,0 +1,169 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Ingest Document - RAG Search{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-8 max-w-4xl">
+    <!-- Back to Dashboard -->
+    <div class="mb-6">
+        <a href="{% url 'search:dashboard' %}" class="text-olive-gray hover:text-warm-brick transition-colors flex items-center gap-2">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                <path fill-rule="evenodd" d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z" clip-rule="evenodd" />
+            </svg>
+            Back to Dashboard
+        </a>
+    </div>
+
+    <!-- Page Header -->
+    <div class="mb-8">
+        <h1 class="text-3xl font-bold text-deep-navy mb-2">Ingest Document</h1>
+        <p class="text-olive-gray">Submit a document for indexing in the RAG search system</p>
+    </div>
+
+    <!-- Ingestion Form -->
+    <div class="bg-white rounded-lg shadow-md p-6">
+        <form 
+            hx-post="{% url 'search:ingest_document' %}" 
+            hx-target="#ingest-result"
+            hx-indicator="#ingest-loading"
+            class="space-y-6">
+            {% csrf_token %}
+
+            <!-- Document Content -->
+            <div>
+                <label for="content" class="block text-sm font-medium text-deep-navy mb-2">
+                    Document Content <span class="text-warm-brick">*</span>
+                </label>
+                <textarea 
+                    id="content" 
+                    name="content" 
+                    rows="12"
+                    required
+                    placeholder="Paste or type the document content here..."
+                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-soft-sky-blue focus:border-transparent resize-y"
+                ></textarea>
+                <p class="mt-1 text-sm text-gray-500">The content will be chunked and indexed for semantic search</p>
+            </div>
+
+            <!-- Metadata Section -->
+            <div class="border-t pt-6">
+                <h3 class="text-lg font-semibold text-deep-navy mb-4">Document Metadata</h3>
+                
+                <div class="grid md:grid-cols-2 gap-4">
+                    <!-- Source Type -->
+                    <div>
+                        <label for="source_type" class="block text-sm font-medium text-deep-navy mb-2">
+                            Source Type <span class="text-warm-brick">*</span>
+                        </label>
+                        <select 
+                            id="source_type" 
+                            name="source_type"
+                            required
+                            class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-soft-sky-blue focus:border-transparent"
+                        >
+                            <option value="local">Local</option>
+                            <option value="sharepoint">SharePoint</option>
+                            <option value="onedrive">OneDrive</option>
+                            <option value="teams">Teams</option>
+                            <option value="notion">Notion</option>
+                            <option value="quickbooks">QuickBooks</option>
+                            <option value="other">Other</option>
+                        </select>
+                    </div>
+
+                    <!-- File Name -->
+                    <div>
+                        <label for="file_name" class="block text-sm font-medium text-deep-navy mb-2">
+                            File Name
+                        </label>
+                        <input 
+                            type="text" 
+                            id="file_name" 
+                            name="file_name"
+                            placeholder="document.pdf"
+                            class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-soft-sky-blue focus:border-transparent"
+                        />
+                    </div>
+
+                    <!-- Title -->
+                    <div>
+                        <label for="title" class="block text-sm font-medium text-deep-navy mb-2">
+                            Document Title
+                        </label>
+                        <input 
+                            type="text" 
+                            id="title" 
+                            name="title"
+                            placeholder="Q4 2025 Report"
+                            class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-soft-sky-blue focus:border-transparent"
+                        />
+                    </div>
+
+                    <!-- Author -->
+                    <div>
+                        <label for="author" class="block text-sm font-medium text-deep-navy mb-2">
+                            Author
+                        </label>
+                        <input 
+                            type="text" 
+                            id="author" 
+                            name="author"
+                            placeholder="John Doe"
+                            class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-soft-sky-blue focus:border-transparent"
+                        />
+                    </div>
+                </div>
+            </div>
+
+            <!-- Security Notice -->
+            <div class="bg-soft-sky-blue/10 border border-soft-sky-blue/30 rounded-lg p-4">
+                <div class="flex items-start gap-3">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-soft-sky-blue flex-shrink-0 mt-0.5" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd" />
+                    </svg>
+                    <div class="text-sm">
+                        <p class="font-medium text-deep-navy mb-1">Access Control</p>
+                        <p class="text-olive-gray">This document will be accessible to you ({{ request.user.email }}) and any groups you belong to through Microsoft Entra ID.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Submit Button -->
+            <div class="flex items-center justify-between pt-4">
+                <button 
+                    type="submit"
+                    class="px-6 py-3 text-white rounded-lg hover:opacity-90 transition-all duration-200 flex items-center gap-2 font-medium"
+                    style="background-color: var(--color-olive-gray);"
+                >
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd" />
+                    </svg>
+                    Ingest Document
+                </button>
+
+                <!-- Loading Indicator -->
+                <div id="ingest-loading" class="htmx-indicator flex items-center gap-2" style="color: var(--color-olive-gray);">
+                    <svg class="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    <span>Processing...</span>
+                </div>
+            </div>
+        </form>
+    </div>
+
+    <!-- Result Container -->
+    <div id="ingest-result" class="mt-6"></div>
+</div>
+
+<style>
+    .htmx-indicator {
+        display: none;
+    }
+    .htmx-request .htmx-indicator {
+        display: flex;
+    }
+</style>
+{% endblock %}

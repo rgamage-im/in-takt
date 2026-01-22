@@ -53,17 +53,13 @@
         color: white;
     }
     
-    .pulse-animation {
-        animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+    /* HTMX indicator - hidden by default, shown during requests */
+    .htmx-indicator {
+        display: none;
     }
-    
-    @keyframes pulse {
-        0%, 100% {
-            opacity: 1;
-        }
-        50% {
-            opacity: 0.5;
-        }
+    .htmx-request .htmx-indicator,
+    .htmx-request.htmx-indicator {
+        display: inline-block;
     }
 </style>
 {% endblock %}
@@ -85,14 +81,17 @@
                 <button
                     hx-get="{% url 'search:health_status' %}"
                     hx-target="#health-status-container"
-                    hx-indicator="#refresh-spinner"
+                    hx-indicator="#refresh-indicator"
                     class="px-4 py-2 rounded-md text-white font-medium hover:opacity-90 transition-opacity flex items-center gap-2"
                     style="background-color: var(--color-warm-brick);">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
                     </svg>
                     <span>Refresh Status</span>
-                    <span id="refresh-spinner" class="htmx-indicator pulse-animation">⟳</span>
+                    <svg id="refresh-indicator" class="htmx-indicator animate-spin ml-2 h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
                 </button>
             </div>
         </div>
@@ -219,24 +218,33 @@
         </h2>
         <div class="bg-white rounded-lg shadow p-6">
             <div class="flex flex-wrap gap-4">
-                <button
-                    disabled
-                    class="px-6 py-3 rounded-md font-medium transition-opacity opacity-50 cursor-not-allowed"
-                    style="background-color: var(--color-soft-sky-blue); color: var(--color-deep-navy);">
+                <a
+                    href="{% url 'search:ingest_document' %}"
+                    class="px-6 py-3 rounded-md font-medium transition-all hover:opacity-90 flex items-center gap-2"
+                    style="background-color: var(--color-olive-gray); color: white;">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd" />
+                    </svg>
                     Ingest Document
-                    <span class="ml-2 text-xs">(Coming Soon)</span>
-                </button>
-                <button
-                    disabled
-                    class="px-6 py-3 rounded-md font-medium transition-opacity opacity-50 cursor-not-allowed"
-                    style="background-color: var(--color-soft-sky-blue); color: var(--color-deep-navy);">
+                </a>
+                <a
+                    href="{% url 'search:delete_document' %}"
+                    class="px-6 py-3 rounded-md font-medium transition-all hover:opacity-90 flex items-center gap-2"
+                    style="background-color: var(--color-warm-brick); color: white;">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd" />
+                    </svg>
                     Delete Document
-                    <span class="ml-2 text-xs">(Coming Soon)</span>
-                </button>
+                </a>
             </div>
-            <p class="mt-4 text-sm" style="color: var(--color-olive-gray);">
-                Phase 2: Document search active. Ingestion and deletion features coming soon.
-            </p>
+            <div class="mt-4 bg-soft-sky-blue/10 border border-soft-sky-blue/30 rounded p-3">
+                <p class="text-sm flex items-start gap-2" style="color: var(--color-deep-navy);">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 flex-shrink-0 mt-0.5" style="color: var(--color-soft-sky-blue);" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd" />
+                    </svg>
+                    <span><strong>Phase 3:</strong> Document ingestion and deletion features are now available. Documents are automatically secured with Microsoft Entra ID ACL based on your user profile and groups.</span>
+                </p>
+            </div>
         </div>
     </div>
 

@@ -1,8 +1,10 @@
 import requests
+import json
 from django.shortcuts import render
 from django.contrib.auth.decorators import login_required
 from django.conf import settings
 from django.views.decorators.http import require_http_methods
+from django.http import JsonResponse
 
 
 @login_required
@@ -48,7 +50,12 @@ def health_status(request):
             )
             count_response.raise_for_status()
             count_data = count_response.json()
-            document_count = count_data.get("total_results", 0)
+            # Check if there are actual results, not just total_results field
+            if count_data.get("results") and len(count_data.get("results", [])) > 0:
+                document_count = count_data.get("total_results", 0)
+            else:
+                # No actual results, so count is 0 even if total_results says otherwise
+                document_count = 0
         except:
             document_count = None
         
@@ -109,12 +116,30 @@ def search_documents(request):
         return render(request, "search/search_results_partial.html", context)
     
     try:
-        # Prepare search payload
+        # Prepare search payload with ACL filtering
         payload = {
             "query": query,
             "top_k": top_k,
             "vector_weight": vector_weight
         }
+        
+        # Add ACL filters using current user's email from Azure AD SSO
+        if request.user.is_authenticated:
+            user_email = request.user.email
+            # Get user groups from social auth extra_data if available
+            user_groups = []
+            try:
+                social = request.user.social_auth.filter(provider='azuread-tenant-oauth2').first()
+                if social and social.extra_data:
+                    # Azure AD groups are typically in extra_data
+                    user_groups = social.extra_data.get('groups', [])
+            except:
+                pass
+            
+            if user_email:
+                payload["acl_users"] = [user_email]
+            if user_groups:
+                payload["acl_groups"] = user_groups
         
         # Call RAG API search endpoint
         response = requests.post(
@@ -167,3 +192,188 @@ def search_documents(request):
         }
     
     return render(request, "search/search_results_partial.html", context)
+
+
+@login_required
+@require_http_methods(["GET", "POST"])
+def ingest_document(request):
+    """Document ingestion form and handler"""
+    if request.method == "GET":
+        return render(request, "search/ingest_document.html")
+    
+    # Handle POST - submit document for ingestion
+    content = request.POST.get("content", "").strip()
+    source_type = request.POST.get("source_type", "local")
+    file_name = request.POST.get("file_name", "").strip()
+    title = request.POST.get("title", "").strip()
+    author = request.POST.get("author", "").strip()
+    
+    if not content:
+        context = {
+            "error": "Document content is required",
+            "success": False
+        }
+        return render(request, "search/ingest_result_partial.html", context)
+    
+    try:
+        # Build metadata
+        # Use file_name as source identifier, or generate a generic one
+        source_identifier = file_name if file_name else f"portal-upload-{request.user.username}"
+        
+        metadata = {
+            "source": source_identifier,
+            "source_type": source_type,
+            "file_type": "text"
+        }
+        
+        if file_name:
+            metadata["file_name"] = file_name
+        if title:
+            metadata["title"] = title
+        else:
+            # If no title provided, use file_name as fallback
+            if file_name:
+                metadata["title"] = file_name
+        if author:
+            metadata["author"] = author
+        
+        # Add ACL - default to current user
+        acl = {}
+        if request.user.is_authenticated and request.user.email:
+            acl["allowed_users"] = [request.user.email]
+            
+            # Try to get user's groups from Azure AD
+            try:
+                social = request.user.social_auth.filter(provider='azuread-tenant-oauth2').first()
+                if social and social.extra_data:
+                    user_groups = social.extra_data.get('groups', [])
+                    if user_groups:
+                        acl["allowed_groups"] = user_groups
+            except:
+                pass
+        
+        # Prepare payload
+        payload = {
+            "content": content,
+            "metadata": metadata
+        }
+        if acl:
+            payload["acl"] = acl
+        
+        # Call RAG API ingest endpoint
+        response = requests.post(
+            f"{settings.RAG_API_BASE_URL}/api/v1/ingest/document",
+            headers={
+                "X-API-Key": settings.RAG_API_KEY,
+                "Content-Type": "application/json"
+            },
+            json=payload,
+            timeout=60
+        )
+        response.raise_for_status()
+        data = response.json()
+        
+        context = {
+            "success": True,
+            "document_id": data.get("document_id"),
+            "chunks_indexed": data.get("chunks_indexed", 0),
+            "error": None
+        }
+        
+    except requests.exceptions.Timeout:
+        context = {
+            "error": "Ingestion request timed out. The document may be too large.",
+            "success": False
+        }
+    except requests.exceptions.ConnectionError:
+        context = {
+            "error": "Cannot connect to RAG API. Please check if the service is running.",
+            "success": False
+        }
+    except requests.exceptions.HTTPError as e:
+        try:
+            error_detail = e.response.json().get("detail", str(e))
+        except:
+            error_detail = str(e)
+        context = {
+            "error": f"Ingestion failed: {error_detail}",
+            "success": False
+        }
+    except Exception as e:
+        context = {
+            "error": f"Unexpected error: {str(e)}",
+            "success": False
+        }
+    
+    return render(request, "search/ingest_result_partial.html", context)
+
+
+@login_required
+@require_http_methods(["GET", "POST"])
+def delete_document(request):
+    """Document deletion form and handler"""
+    if request.method == "GET":
+        return render(request, "search/delete_document.html")
+    
+    # Handle POST - delete document
+    document_id = request.POST.get("document_id", "").strip()
+    
+    if not document_id:
+        context = {
+            "error": "Document ID is required",
+            "success": False
+        }
+        return render(request, "search/delete_result_partial.html", context)
+    
+    try:
+        # Call RAG API delete endpoint
+        response = requests.delete(
+            f"{settings.RAG_API_BASE_URL}/api/v1/ingest/document/{document_id}",
+            headers={
+                "X-API-Key": settings.RAG_API_KEY
+            },
+            timeout=30
+        )
+        response.raise_for_status()
+        data = response.json()
+        
+        context = {
+            "success": True,
+            "document_id": document_id,
+            "chunks_deleted": data.get("chunks_deleted", 0),
+            "error": None
+        }
+        
+    except requests.exceptions.Timeout:
+        context = {
+            "error": "Deletion request timed out.",
+            "success": False
+        }
+    except requests.exceptions.ConnectionError:
+        context = {
+            "error": "Cannot connect to RAG API. Please check if the service is running.",
+            "success": False
+        }
+    except requests.exceptions.HTTPError as e:
+        if e.response.status_code == 404:
+            context = {
+                "error": f"Document '{document_id}' not found.",
+                "success": False
+            }
+        else:
+            try:
+                error_detail = e.response.json().get("detail", str(e))
+            except:
+                error_detail = str(e)
+            context = {
+                "error": f"Deletion failed: {error_detail}",
+                "success": False
+            }
+    except Exception as e:
+        context = {
+            "error": f"Unexpected error: {str(e)}",
+            "success": False
+        }
+    
+    return render(request, "search/delete_result_partial.html", context)
+

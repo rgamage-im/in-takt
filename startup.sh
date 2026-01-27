@@ -21,9 +21,9 @@ echo "Ensuring superuser exists..."
 python manage.py ensure_superuser
 
 # Start Gunicorn
-echo "Starting Gunicorn on 0.0.0.0:8000..."
+echo "Starting Gunicorn on 0.0.0.0:8080..."
 exec gunicorn config.wsgi:application \
-    --bind=0.0.0.0:8000 \
+    --bind=0.0.0.0:8080 \
     --workers=4 \
     --timeout=600 \
     --access-logfile=- \

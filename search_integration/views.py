@@ -37,32 +37,9 @@ def health_status(request):
         readiness_response.raise_for_status()
         readiness_data = readiness_response.json()
         
-        # Get document count via search with wildcard
-        try:
-            count_response = requests.post(
-                f"{settings.RAG_API_BASE_URL}/api/v1/retrieve/search",
-                headers={
-                    "X-API-Key": settings.RAG_API_KEY,
-                    "Content-Type": "application/json"
-                },
-                json={"query": "*", "top_k": 1},
-                timeout=5
-            )
-            count_response.raise_for_status()
-            count_data = count_response.json()
-            # Check if there are actual results, not just total_results field
-            if count_data.get("results") and len(count_data.get("results", [])) > 0:
-                document_count = count_data.get("total_results", 0)
-            else:
-                # No actual results, so count is 0 even if total_results says otherwise
-                document_count = 0
-        except:
-            document_count = None
-        
         context = {
             "health": health_data,
             "readiness": readiness_data,
-            "document_count": document_count,
             "error": None,
             "connected": True
         }

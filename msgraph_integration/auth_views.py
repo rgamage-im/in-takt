@@ -147,8 +147,8 @@ class GraphExploreView(View):
             request.session['graph_next'] = 'msgraph:my-profile-page'
             return redirect('msgraph:graph-login')
 
-
 @method_decorator(login_required, name='dispatch')
+
 class TeamsMessagesTableView(View):
     """
     Display Teams channel messages in a table view using Tabulator

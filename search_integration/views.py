@@ -37,9 +37,26 @@ def health_status(request):
         readiness_response.raise_for_status()
         readiness_data = readiness_response.json()
         
+        # Get stats (document count and index size)
+        try:
+            stats_response = requests.get(
+                f"{settings.RAG_API_BASE_URL}/api/v1/stats",
+                headers={"X-API-Key": settings.RAG_API_KEY},
+                timeout=5
+            )
+            stats_response.raise_for_status()
+            stats_data = stats_response.json()
+            unique_documents = stats_data.get("documents_index", {}).get("unique_documents")
+            index_size_bytes = stats_data.get("documents_index", {}).get("index_size_bytes")
+        except:
+            unique_documents = None
+            index_size_bytes = None
+        
         context = {
             "health": health_data,
             "readiness": readiness_data,
+            "unique_documents": unique_documents,
+            "index_size_bytes": index_size_bytes,
             "error": None,
             "connected": True
         }

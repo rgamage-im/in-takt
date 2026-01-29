@@ -19,7 +19,12 @@ pip install --upgrade dj-database-url==3.1.0
 
 echo ""
 echo "🔄 Running migrations..."
-python manage.py migrate
+cd .. && python manage.py migrate && cd upgrade_scripts
+
+echo ""
+echo "📝 Updating requirements.txt..."
+sed -i 's/^psycopg2-binary==.*/psycopg2-binary==2.9.11/' ../requirements.txt
+sed -i 's/^dj-database-url==.*/dj-database-url==3.1.0/' ../requirements.txt
 
 echo ""
 echo "✅ Phase 6A Complete!"

@@ -24,6 +24,10 @@ echo "📦 Updating redis..."
 pip install --upgrade redis==7.1.0
 
 echo ""
+echo "📝 Updating requirements.txt..."
+sed -i 's/^redis==.*/redis==7.1.0/' ../requirements.txt
+
+echo ""
 echo "✅ Phase 6B Complete!"
 echo ""
 echo "🧪 CRITICAL TESTING REQUIRED:"

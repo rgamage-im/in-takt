@@ -13,6 +13,10 @@ echo "📦 Updating python-dotenv..."
 pip install --upgrade python-dotenv==1.2.1
 
 echo ""
+echo "📝 Updating requirements.txt..."
+sed -i 's/^python-dotenv==.*/python-dotenv==1.2.1/' ../requirements.txt
+
+echo ""
 echo "✅ Phase 1C Complete!"
 echo ""
 echo "🧪 TESTING REQUIRED:"

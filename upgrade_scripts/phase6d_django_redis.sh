@@ -17,7 +17,11 @@ pip install --upgrade django-redis==6.0.0
 
 echo ""
 echo "🔄 Running migrations..."
-python manage.py migrate
+cd .. && python manage.py migrate && cd upgrade_scripts
+
+echo ""
+echo "📝 Updating requirements.txt..."
+sed -i 's/^django-redis==.*/django-redis==6.0.0/' ../requirements.txt
 
 echo ""
 echo "✅ Phase 6D Complete!"

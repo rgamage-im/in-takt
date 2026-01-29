@@ -13,6 +13,10 @@ echo "📦 Updating Pydantic..."
 pip install --upgrade pydantic==2.12.5
 
 echo ""
+echo "📝 Updating requirements.txt..."
+sed -i 's/^pydantic==.*/pydantic==2.12.5/' ../requirements.txt
+
+echo ""
 echo "✅ Phase 5A Complete!"
 echo ""
 echo "🧪 TESTING REQUIRED:"

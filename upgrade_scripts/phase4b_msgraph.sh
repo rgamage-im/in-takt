@@ -24,6 +24,10 @@ echo "📦 Updating Microsoft Graph SDK..."
 pip install --upgrade msgraph-sdk==1.53.0
 
 echo ""
+echo "📝 Updating requirements.txt..."
+sed -i 's/^msgraph-sdk==.*/msgraph-sdk==1.53.0/' ../requirements.txt
+
+echo ""
 echo "✅ Phase 4B Complete!"
 echo ""
 echo "🧪 CRITICAL TESTING REQUIRED:"

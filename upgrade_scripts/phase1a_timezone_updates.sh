@@ -13,6 +13,11 @@ echo "📦 Updating timezone packages..."
 pip install --upgrade pytz==2025.2 tzdata==2025.3
 
 echo ""
+echo "📝 Updating requirements.txt..."
+sed -i 's/^pytz==.*/pytz==2025.2/' ../requirements.txt
+sed -i 's/^tzdata==.*/tzdata==2025.3/' ../requirements.txt
+
+echo ""
 echo "✅ Phase 1A Complete!"
 echo ""
 echo "🧪 TESTING REQUIRED:"

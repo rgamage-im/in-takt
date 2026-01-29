@@ -13,6 +13,11 @@ echo "📦 Updating HTTP client libraries..."
 pip install --upgrade requests==2.32.5 httpx==0.28.1
 
 echo ""
+echo "📝 Updating requirements.txt..."
+sed -i 's/^requests==.*/requests==2.32.5/' ../requirements.txt
+sed -i 's/^httpx==.*/httpx==0.28.1/' ../requirements.txt
+
+echo ""
 echo "✅ Phase 1B Complete!"
 echo ""
 echo "🧪 TESTING REQUIRED:"

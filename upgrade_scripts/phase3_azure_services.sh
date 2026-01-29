@@ -22,6 +22,13 @@ echo "📦 Updating Azure Monitor OpenTelemetry..."
 pip install --upgrade azure-monitor-opentelemetry==1.8.5
 
 echo ""
+echo "📝 Updating requirements.txt..."
+sed -i 's/^azure-identity==.*/azure-identity==1.25.1/' ../requirements.txt
+sed -i 's/^azure-keyvault-secrets==.*/azure-keyvault-secrets==4.10.0/' ../requirements.txt
+sed -i 's/^azure-storage-blob==.*/azure-storage-blob==12.28.0/' ../requirements.txt
+sed -i 's/^azure-monitor-opentelemetry==.*/azure-monitor-opentelemetry==1.8.5/' ../requirements.txt
+
+echo ""
 echo "✅ Phase 3 Complete!"
 echo ""
 echo "🧪 TESTING REQUIRED:"

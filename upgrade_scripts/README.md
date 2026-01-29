@@ -30,6 +30,8 @@
 
 Execute scripts in numerical order. **Test thoroughly after each phase** before proceeding to the next.
 
+**Note:** Each script automatically updates only the upgraded package versions in `requirements.txt`, preserving the clean, curated format.
+
 ### Phase 1: Low-Risk Updates (DO FIRST)
 - `phase1a_timezone_updates.sh` - Timezone & date utilities
 - `phase1b_http_clients.sh` - HTTP client libraries

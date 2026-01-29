@@ -13,6 +13,10 @@ echo "📦 Updating MSAL..."
 pip install --upgrade msal==1.34.0
 
 echo ""
+echo "📝 Updating requirements.txt..."
+sed -i 's/^msal==.*/msal==1.34.0/' ../requirements.txt
+
+echo ""
 echo "✅ Phase 4A Complete!"
 echo ""
 echo "🧪 TESTING REQUIRED:"

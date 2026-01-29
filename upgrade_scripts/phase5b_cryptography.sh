@@ -24,6 +24,10 @@ echo "📦 Updating cryptography..."
 pip install --upgrade cryptography==46.0.4
 
 echo ""
+echo "📝 Updating requirements.txt..."
+sed -i 's/^cryptography==.*/cryptography==46.0.4/' ../requirements.txt
+
+echo ""
 echo "✅ Phase 5B Complete!"
 echo ""
 echo "🧪 CRITICAL TESTING REQUIRED:"

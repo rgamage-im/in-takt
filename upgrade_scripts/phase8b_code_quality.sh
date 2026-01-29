@@ -26,6 +26,13 @@ echo "📦 Updating mypy..."
 pip install --upgrade mypy==1.19.1
 
 echo ""
+echo "📝 Updating requirements.txt..."
+sed -i 's/^black==.*/black==26.1.0/' ../requirements.txt
+sed -i 's/^flake8==.*/flake8==7.3.0/' ../requirements.txt
+sed -i 's/^isort==.*/isort==7.0.0/' ../requirements.txt
+sed -i 's/^mypy==.*/mypy==1.19.1/' ../requirements.txt
+
+echo ""
 echo "✅ Phase 8B Complete!"
 echo ""
 echo "🧪 TESTING REQUIRED:"

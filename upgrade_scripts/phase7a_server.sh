@@ -19,6 +19,11 @@ echo "📦 Updating Whitenoise..."
 pip install --upgrade whitenoise==6.11.0
 
 echo ""
+echo "📝 Updating requirements.txt..."
+sed -i 's/^gunicorn==.*/gunicorn==24.1.1/' ../requirements.txt
+sed -i 's/^whitenoise==.*/whitenoise==6.11.0/' ../requirements.txt
+
+echo ""
 echo "✅ Phase 7A Complete!"
 echo ""
 echo "🧪 CRITICAL TESTING REQUIRED:"

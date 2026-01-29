@@ -13,6 +13,11 @@ echo "📦 Updating QuickBooks packages..."
 pip install --upgrade intuit-oauth==1.2.6 python-quickbooks==0.9.12
 
 echo ""
+echo "📝 Updating requirements.txt..."
+sed -i 's/^intuit-oauth==.*/intuit-oauth==1.2.6/' ../requirements.txt
+sed -i 's/^python-quickbooks==.*/python-quickbooks==0.9.12/' ../requirements.txt
+
+echo ""
 echo "✅ Phase 1D Complete!"
 echo ""
 echo "🧪 TESTING REQUIRED:"

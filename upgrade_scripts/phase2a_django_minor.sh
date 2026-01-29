@@ -31,7 +31,14 @@ pip install --upgrade django-cors-headers==4.9.0
 
 echo ""
 echo "🔄 Running migrations..."
-python manage.py migrate
+cd .. && python manage.py migrate && cd upgrade_scripts
+
+echo ""
+echo "📝 Updating requirements.txt..."
+sed -i 's/^djangorestframework==.*/djangorestframework==3.16.1/' ../requirements.txt
+sed -i 's/^drf-spectacular==.*/drf-spectacular==0.29.0/' ../requirements.txt
+sed -i 's/^django-htmx==.*/django-htmx==1.27.0/' ../requirements.txt
+sed -i 's/^django-cors-headers==.*/django-cors-headers==4.9.0/' ../requirements.txt
 
 echo ""
 echo "✅ Phase 2A Complete!"

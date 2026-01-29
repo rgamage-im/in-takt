@@ -13,6 +13,10 @@ echo "📦 Updating Celery..."
 pip install --upgrade celery==5.6.2
 
 echo ""
+echo "📝 Updating requirements.txt..."
+sed -i 's/^celery==.*/celery==5.6.2/' ../requirements.txt
+
+echo ""
 echo "✅ Phase 6C Complete!"
 echo ""
 echo "🧪 TESTING REQUIRED:"

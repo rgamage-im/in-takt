@@ -4,26 +4,26 @@
 
 # Core Django Framework
 Django==5.2.7  # LTS version
-djangorestframework==3.15.2
+djangorestframework==3.16.1
 
 # OpenAPI/Swagger Documentation
-drf-spectacular==0.27.2
+drf-spectacular==0.29.0
 
 # HTMX Integration
-django-htmx==1.19.0
+django-htmx==1.27.0
 
 # Microsoft Graph API Integration
-msal==1.31.0
+msal==1.34.0
 msgraph-sdk==1.12.0
 
 # QuickBooks API Integration
-intuit-oauth==1.2.4
-python-quickbooks==0.9.6
+intuit-oauth==1.2.6
+python-quickbooks==0.9.12
 
 # Azure Services
-azure-identity==1.19.0
-azure-keyvault-secrets==4.9.0
-azure-storage-blob==12.23.1
+azure-identity==1.25.1
+azure-keyvault-secrets==4.10.0
+azure-storage-blob==12.28.0
 
 # Database
 psycopg2-binary==2.9.10
@@ -35,22 +35,22 @@ celery==5.4.0
 django-redis==5.4.0
 
 # Environment Variables
-python-dotenv==1.0.1
+python-dotenv==1.2.1
 
 # HTTP Requests
-requests==2.32.3
-httpx==0.27.2
+requests==2.32.5
+httpx==0.28.1
 
 # Data Validation and Serialization
 pydantic==2.9.2
 python-dateutil==2.9.0.post0
 
 # Monitoring and Logging
-azure-monitor-opentelemetry==1.6.4
+azure-monitor-opentelemetry==1.8.5
 
 # Utilities
-pytz==2024.2
-tzdata==2024.2
+pytz==2025.2
+tzdata==2025.3
 
 # Development Dependencies
 pytest==8.3.3
@@ -64,10 +64,10 @@ mypy==1.13.0
 
 # Security
 cryptography==43.0.3
-django-cors-headers==4.6.0
+django-cors-headers==4.9.0
 
 # Authentication & SSO
-social-auth-app-django==5.6.0
+social-auth-app-django==5.7.0
 
 # WSGI/ASGI Server
 gunicorn==23.0.0

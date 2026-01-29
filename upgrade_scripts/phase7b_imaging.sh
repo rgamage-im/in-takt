@@ -16,6 +16,10 @@ echo "📦 Updating Pillow..."
 pip install --upgrade pillow==12.1.0
 
 echo ""
+echo "📝 Updating requirements.txt..."
+sed -i 's/^pillow==.*/pillow==12.1.0/' ../requirements.txt
+
+echo ""
 echo "✅ Phase 7B Complete!"
 echo ""
 echo "🧪 CRITICAL TESTING REQUIRED:"

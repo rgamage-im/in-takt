@@ -26,6 +26,13 @@ echo "📦 Updating pytest-mock..."
 pip install --upgrade pytest-mock==3.15.1
 
 echo ""
+echo "📝 Updating requirements.txt..."
+sed -i 's/^pytest==.*/pytest==9.0.2/' ../requirements.txt
+sed -i 's/^pytest-django==.*/pytest-django==4.11.1/' ../requirements.txt
+sed -i 's/^pytest-cov==.*/pytest-cov==7.0.0/' ../requirements.txt
+sed -i 's/^pytest-mock==.*/pytest-mock==3.15.1/' ../requirements.txt
+
+echo ""
 echo "✅ Phase 8A Complete!"
 echo ""
 echo "🧪 TESTING REQUIRED:"

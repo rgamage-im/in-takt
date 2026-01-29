@@ -67,7 +67,7 @@ def upload_receipt():
     print("3. Preparing upload request...")
     
     # Construct the upload endpoint
-    upload_url = f"{BASE_URL}/v3/company/{REALM_ID}/upload"
+    upload_url = f"{BASE_URL}/v3/company/{REALM_ID}/attachable"
     print(f"   URL: {upload_url}")
     
     # Prepare headers
@@ -80,7 +80,6 @@ def upload_receipt():
     # Prepare metadata
     metadata = {
         "FileName": file_path.name,
-        "ContentType": "application/pdf",
         "AttachableRef": [
             {
                 "EntityRef": {
@@ -116,13 +115,23 @@ def upload_receipt():
     print()
     
     try:
+        # Create a prepared request to inspect actual headers
+        req = requests.Request('POST', upload_url, headers=headers, files=files)
+        prepared = req.prepare()
+        
+        # Print actual request headers that will be sent
+        print("   Request Headers Being Sent:")
+        for key, value in prepared.headers.items():
+            # Truncate Authorization header for security
+            if key.lower() == 'authorization':
+                print(f"      {key}: {value[:50]}...")
+            else:
+                print(f"      {key}: {value}")
+        print()
+        
         # Send the request
-        response = requests.post(
-            upload_url,
-            headers=headers,
-            files=files,
-            timeout=60
-        )
+        session = requests.Session()
+        response = session.send(prepared, timeout=60)
         
         # Print response details
         print("6. Response received:")

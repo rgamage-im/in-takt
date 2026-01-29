@@ -82,6 +82,9 @@ secrets.json
 *.key
 *.cert
 
+# Database backups (contain sensitive data)
+backup_*.json
+
 # Logs
 logs/
 *.log

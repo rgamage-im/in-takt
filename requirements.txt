@@ -3,7 +3,7 @@
 # Generated: October 24, 2025
 
 # Core Django Framework
-Django==5.2.7  # LTS version
+Django>=5.2.7,<6.0  # Stay on 5.x LTS version
 djangorestframework==3.16.1
 
 # OpenAPI/Swagger Documentation

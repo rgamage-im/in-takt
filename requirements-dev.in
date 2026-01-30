@@ -1,0 +1,16 @@
+# Development Dependencies Only
+# Use: pip-compile requirements-dev.in
+
+-c requirements.txt  # Constrain to versions in main requirements
+
+# Testing
+pytest
+pytest-django
+pytest-cov
+pytest-mock
+
+# Code Quality
+black
+flake8
+isort
+mypy

@@ -1,0 +1,69 @@
+# In-Takt Web Portal - Top-Level Dependencies
+# Python 3.12+
+# This is the source file for pip-compile to generate requirements.txt
+
+# Core Django Framework
+Django>=5.2,<6.0  # Stay on 5.x LTS version
+djangorestframework
+drf-spectacular
+
+# Frontend
+django-htmx
+django-cors-headers
+
+# Microsoft Integration
+msal
+msgraph-sdk
+
+# QuickBooks Integration
+intuit-oauth
+python-quickbooks
+
+# Azure Services
+azure-identity
+azure-keyvault-secrets
+azure-storage-blob
+azure-monitor-opentelemetry
+
+# Database
+psycopg2-binary
+dj-database-url
+
+# Caching and Task Queue
+redis
+celery
+django-redis
+
+# Environment & Config
+python-dotenv
+
+# HTTP Clients
+requests
+httpx
+
+# Data Processing
+pydantic
+python-dateutil
+pytz
+tzdata
+
+# Security & Authentication
+cryptography
+social-auth-app-django
+
+# WSGI Server & Static Files
+gunicorn
+whitenoise
+
+# Image Processing
+pillow
+
+# Development & Testing (optional, can be in requirements-dev.in)
+pytest
+pytest-django
+pytest-cov
+pytest-mock
+black
+flake8
+isort
+mypy

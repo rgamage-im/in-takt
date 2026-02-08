@@ -50,7 +50,7 @@ if website_hostname := os.getenv('WEBSITE_HOSTNAME'):
     ALLOWED_HOSTS.append(website_hostname)
 
 # Allow Azure's internal health check IPs (169.254.x.x range)
-ALLOWED_HOSTS.extend(['169.254.129.4', '169.254.129.1'])
+ALLOWED_HOSTS.extend(['169.254.129.4', '169.254.129.1', '169.254.130.4'])
 
 
 # Application definition

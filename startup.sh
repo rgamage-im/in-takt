@@ -20,9 +20,9 @@ python manage.py migrate --noinput
 echo "Ensuring superuser exists..."
 python manage.py ensure_superuser
 
-# Start Gunicorn with minimal test app
-echo "Starting Gunicorn on 0.0.0.0:8000 with MINIMAL TEST APP..."
-exec gunicorn test_minimal:application \
+# Start Gunicorn with Django app
+echo "Starting Gunicorn on 0.0.0.0:8000 with Django..."
+exec gunicorn config.wsgi:application \
     --bind=0.0.0.0:8000 \
     --workers=2 \
     --timeout=120 \

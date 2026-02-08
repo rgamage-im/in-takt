@@ -40,8 +40,59 @@
             class="space-y-6">
             {% csrf_token %}
 
-            <!-- Document Content -->
-            <div>
+            <!-- Upload Method Toggle -->
+            <div class="flex gap-4 mb-6">
+                <button type="button" id="upload-tab" class="flex-1 py-2 px-4 text-sm font-medium rounded-lg transition-colors upload-tab-active">
+                    Upload File
+                </button>
+                <button type="button" id="text-tab" class="flex-1 py-2 px-4 text-sm font-medium rounded-lg transition-colors upload-tab-inactive">
+                    Paste Text
+                </button>
+            </div>
+
+            <!-- File Upload Section -->
+            <div id="file-upload-section" class="upload-section">
+                <label class="block text-sm font-medium text-deep-navy mb-2">
+                    Upload Document <span class="text-warm-brick">*</span>
+                </label>
+                
+                <!-- Drag and Drop Zone -->
+                <div id="drop-zone" class="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-soft-sky-blue transition-colors cursor-pointer">
+                    <input type="file" id="file-input" name="file" accept=".pdf,.docx,.doc,.xlsx,.xls,.txt" class="hidden">
+                    
+                    <div id="drop-zone-content">
+                        <svg class="mx-auto h-12 w-12 text-gray-400" stroke="currentColor" fill="none" viewBox="0 0 48 48">
+                            <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                        </svg>
+                        <p class="mt-2 text-sm text-olive-gray">
+                            <span class="font-semibold">Click to browse</span> or drag and drop
+                        </p>
+                        <p class="mt-1 text-xs text-gray-500">PDF, DOCX, XLSX, or TXT files (max 50MB)</p>
+                    </div>
+                    
+                    <!-- File Selected Display -->
+                    <div id="file-selected" class="hidden">
+                        <div class="flex items-center justify-center gap-3">
+                            <svg class="h-10 w-10 text-soft-sky-blue" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                            </svg>
+                            <div class="text-left">
+                                <p id="file-name" class="text-sm font-medium text-deep-navy"></p>
+                                <p id="file-size" class="text-xs text-gray-500"></p>
+                            </div>
+                            <button type="button" id="remove-file" class="ml-4 text-warm-brick hover:text-red-700">
+                                <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <p class="mt-2 text-sm text-gray-500">Supported formats: PDF, Word (.docx), Excel (.xlsx), and plain text</p>
+            </div>
+
+            <!-- Text Content Section (Hidden by default) -->
+            <div id="text-content-section" class="upload-section hidden">
                 <label for="content" class="block text-sm font-medium text-deep-navy mb-2">
                     Document Content <span class="text-warm-brick">*</span>
                 </label>
@@ -49,7 +100,6 @@
                     id="content" 
                     name="content" 
                     rows="12"
-                    required
                     placeholder="Paste or type the document content here..."
                     class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-soft-sky-blue focus:border-transparent resize-y"
                 ></textarea>
@@ -166,5 +216,218 @@
     .htmx-request .htmx-indicator {
         display: flex;
     }
+    .upload-tab-active {
+        background-color: var(--color-soft-sky-blue);
+        color: white;
+    }
+    .upload-tab-inactive {
+        background-color: #f3f4f6;
+        color: var(--color-olive-gray);
+    }
+    .upload-tab-inactive:hover {
+        background-color: #e5e7eb;
+    }
+    #drop-zone.drag-over {
+        border-color: var(--color-soft-sky-blue);
+        background-color: rgba(147, 197, 253, 0.1);
+    }
 </style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const uploadTab = document.getElementById('upload-tab');
+    const textTab = document.getElementById('text-tab');
+    const fileUploadSection = document.getElementById('file-upload-section');
+    const textContentSection = document.getElementById('text-content-section');
+    const dropZone = document.getElementById('drop-zone');
+    const fileInput = document.getElementById('file-input');
+    const dropZoneContent = document.getElementById('drop-zone-content');
+    const fileSelected = document.getElementById('file-selected');
+    const fileName = document.getElementById('file-name');
+    const fileSize = document.getElementById('file-size');
+    const removeFileBtn = document.getElementById('remove-file');
+    const contentTextarea = document.getElementById('content');
+    const fileNameInput = document.getElementById('file_name');
+    const titleInput = document.getElementById('title');
+    
+    let currentFile = null;
+    
+    // Tab switching
+    uploadTab.addEventListener('click', function() {
+        uploadTab.classList.remove('upload-tab-inactive');
+        uploadTab.classList.add('upload-tab-active');
+        textTab.classList.remove('upload-tab-active');
+        textTab.classList.add('upload-tab-inactive');
+        fileUploadSection.classList.remove('hidden');
+        textContentSection.classList.add('hidden');
+        contentTextarea.removeAttribute('required');
+    });
+    
+    textTab.addEventListener('click', function() {
+        textTab.classList.remove('upload-tab-inactive');
+        textTab.classList.add('upload-tab-active');
+        uploadTab.classList.remove('upload-tab-active');
+        uploadTab.classList.add('upload-tab-inactive');
+        textContentSection.classList.remove('hidden');
+        fileUploadSection.classList.add('hidden');
+        contentTextarea.setAttribute('required', 'required');
+        // Clear file when switching to text mode
+        if (currentFile) {
+            clearFile();
+        }
+    });
+    
+    // Click to browse
+    dropZone.addEventListener('click', function() {
+        fileInput.click();
+    });
+    
+    // File selection via browse
+    fileInput.addEventListener('change', function(e) {
+        if (e.target.files.length > 0) {
+            handleFile(e.target.files[0]);
+        }
+    });
+    
+    // Drag and drop
+    dropZone.addEventListener('dragover', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        dropZone.classList.add('drag-over');
+    });
+    
+    dropZone.addEventListener('dragleave', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        dropZone.classList.remove('drag-over');
+    });
+    
+    dropZone.addEventListener('drop', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        dropZone.classList.remove('drag-over');
+        
+        if (e.dataTransfer.files.length > 0) {
+            handleFile(e.dataTransfer.files[0]);
+        }
+    });
+    
+    // Remove file
+    removeFileBtn.addEventListener('click', function(e) {
+        e.stopPropagation();
+        clearFile();
+    });
+    
+    function handleFile(file) {
+        // Validate file type
+        const validTypes = ['.pdf', '.docx', '.doc', '.xlsx', '.xls', '.txt'];
+        const fileExt = '.' + file.name.split('.').pop().toLowerCase();
+        
+        if (!validTypes.includes(fileExt)) {
+            alert('Please select a PDF, Word (.docx), Excel (.xlsx), or TXT file');
+            return;
+        }
+        
+        // Validate file size (50MB max)
+        const maxSize = 50 * 1024 * 1024; // 50MB in bytes
+        if (file.size > maxSize) {
+            alert('File size must be less than 50MB');
+            return;
+        }
+        
+        currentFile = file;
+        
+        // Display file info
+        fileName.textContent = file.name;
+        fileSize.textContent = formatFileSize(file.size);
+        dropZoneContent.classList.add('hidden');
+        fileSelected.classList.remove('hidden');
+        
+        // Auto-fill file name and title
+        if (!fileNameInput.value) {
+            fileNameInput.value = file.name;
+        }
+        if (!titleInput.value) {
+            // Remove file extension for title
+            titleInput.value = file.name.replace(/\.[^/.]+$/, '');
+        }
+    }
+    
+    function clearFile() {
+        currentFile = null;
+        fileInput.value = '';
+        dropZoneContent.classList.remove('hidden');
+        fileSelected.classList.add('hidden');
+    }
+    
+    function formatFileSize(bytes) {
+        if (bytes === 0) return '0 Bytes';
+        const k = 1024;
+        const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
+    }
+    
+    // Form submission handling
+    const form = document.querySelector('form');
+    form.addEventListener('submit', function(e) {
+        // Check if we're in file upload mode and have a file
+        if (!textContentSection.classList.contains('hidden')) {
+            // Text mode - let HTMX handle it normally
+            return;
+        }
+        
+        if (!currentFile) {
+            e.preventDefault();
+            alert('Please select a file to upload');
+            return;
+        }
+        
+        // File upload mode - prevent default and use FormData
+        e.preventDefault();
+        
+        const formData = new FormData();
+        formData.append('file', currentFile);
+        
+        // Add metadata
+        const metadata = {
+            source: 'local',
+            source_type: document.getElementById('source_type').value,
+            file_name: fileNameInput.value || currentFile.name,
+            title: titleInput.value,
+            author: document.getElementById('author').value
+        };
+        formData.append('metadata', JSON.stringify(metadata));
+        
+        // Show loading indicator
+        document.getElementById('ingest-loading').style.display = 'flex';
+        
+        // Send via fetch (not HTMX) since we need multipart/form-data
+        fetch('{% url "search:ingest_document_upload" %}', {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+            },
+            body: formData
+        })
+        .then(response => response.text())
+        .then(html => {
+            document.getElementById('ingest-loading').style.display = 'none';
+            document.getElementById('ingest-result').innerHTML = html;
+            // Clear form after successful upload
+            clearFile();
+            form.reset();
+        })
+        .catch(error => {
+            document.getElementById('ingest-loading').style.display = 'none';
+            console.error('Error:', error);
+            document.getElementById('ingest-result').innerHTML = `
+                <div class="bg-red-50 border border-red-200 rounded-lg p-4">
+                    <p class="text-red-800">Upload failed: ${error.message}</p>
+                </div>
+            `;
+        });
+    });
+});
+</script>
 {% endblock %}

@@ -309,6 +309,104 @@ def ingest_document(request):
 
 
 @login_required
+@require_http_methods(["POST"])
+def ingest_document_upload(request):
+    """HTMX endpoint to ingest document via file upload"""
+    try:
+        # Get uploaded file
+        if 'file' not in request.FILES:
+            context = {
+                "error": "No file provided",
+                "success": False
+            }
+            return render(request, "search/ingest_result_partial.html", context)
+        
+        uploaded_file = request.FILES['file']
+        
+        # Parse metadata JSON
+        metadata_json = request.POST.get('metadata', '{}')
+        try:
+            metadata = json.loads(metadata_json)
+        except json.JSONDecodeError:
+            context = {
+                "error": "Invalid metadata JSON",
+                "success": False
+            }
+            return render(request, "search/ingest_result_partial.html", context)
+        
+        # Add ACL - default to current user
+        acl = {}
+        if request.user.is_authenticated and request.user.email:
+            acl["allowed_users"] = [request.user.email]
+            
+            # Try to get user's groups from Azure AD
+            try:
+                social = request.user.social_auth.filter(provider='azuread-tenant-oauth2').first()
+                if social and social.extra_data:
+                    user_groups = social.extra_data.get('groups', [])
+                    if user_groups:
+                        acl["allowed_groups"] = user_groups
+            except:
+                pass
+        
+        # Prepare multipart form data
+        files = {
+            'file': (uploaded_file.name, uploaded_file.read(), uploaded_file.content_type)
+        }
+        data = {
+            'metadata': json.dumps(metadata)
+        }
+        if acl:
+            data['acl'] = json.dumps(acl)
+        
+        # Call RAG API upload endpoint
+        response = requests.post(
+            f"{settings.RAG_API_BASE_URL}/api/v1/ingest/document/upload",
+            headers={
+                "X-API-Key": settings.RAG_API_KEY
+            },
+            files=files,
+            data=data,
+            timeout=RAG_API_TIMEOUT
+        )
+        response.raise_for_status()
+        data = response.json()
+        
+        context = {
+            "success": True,
+            "document_id": data.get("document_id"),
+            "chunks_indexed": data.get("chunks_indexed", 0),
+            "error": None
+        }
+    except requests.exceptions.Timeout:
+        context = {
+            "error": "RAG API timeout - request took too long to respond",
+            "success": False
+        }
+    except requests.exceptions.ConnectionError:
+        context = {
+            "error": "Cannot connect to RAG API. Please check if the service is running.",
+            "success": False
+        }
+    except requests.exceptions.HTTPError as e:
+        try:
+            error_detail = e.response.json().get("detail", str(e))
+        except:
+            error_detail = str(e)
+        context = {
+            "error": f"Upload failed: {error_detail}",
+            "success": False
+        }
+    except Exception as e:
+        context = {
+            "error": f"Unexpected error: {str(e)}",
+            "success": False
+        }
+    
+    return render(request, "search/ingest_result_partial.html", context)
+
+
+@login_required
 @require_http_methods(["GET", "POST"])
 def delete_document(request):
     """Document deletion form and handler"""

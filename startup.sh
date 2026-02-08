@@ -38,11 +38,10 @@ except Exception as e:
 echo "Starting Gunicorn on 0.0.0.0:8080..."
 exec gunicorn config.wsgi:application \
     --bind=0.0.0.0:8080 \
-    --workers=1 \
+    --workers=2 \
     --timeout=120 \
     --graceful-timeout=120 \
     --keep-alive=5 \
-    --preload \
     --access-logfile=- \
     --error-logfile=- \
     --log-level=debug \

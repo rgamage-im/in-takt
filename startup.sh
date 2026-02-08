@@ -20,12 +20,12 @@ python manage.py migrate --noinput
 echo "Ensuring superuser exists..."
 python manage.py ensure_superuser
 
-# Start Gunicorn
-echo "Starting Gunicorn on 0.0.0.0:8080..."
-exec gunicorn config.wsgi:application \
-    --bind=0.0.0.0:8080 \
-    --workers=4 \
-    --timeout=600 \
+# Start Gunicorn with minimal test app
+echo "Starting Gunicorn on 0.0.0.0:8000 with MINIMAL TEST APP..."
+exec gunicorn test_minimal:application \
+    --bind=0.0.0.0:8000 \
+    --workers=2 \
+    --timeout=120 \
     --access-logfile=- \
     --error-logfile=- \
-    --log-level=info
+    --log-level=debug

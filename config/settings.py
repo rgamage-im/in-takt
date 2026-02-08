@@ -20,6 +20,20 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # Load environment variables from .env file
 load_dotenv(BASE_DIR / '.env')
 
+# Check critical environment variables
+print("=" * 60, flush=True)
+print("Environment Variable Check:", flush=True)
+critical_vars = {
+    'DATABASE_URL': os.getenv('DATABASE_URL'),
+    'MICROSOFT_GRAPH_CLIENT_ID': os.getenv('MICROSOFT_GRAPH_CLIENT_ID'),
+    'MICROSOFT_GRAPH_CLIENT_SECRET': os.getenv('MICROSOFT_GRAPH_CLIENT_SECRET')[:20] + '...' if os.getenv('MICROSOFT_GRAPH_CLIENT_SECRET') else None,
+    'MICROSOFT_GRAPH_TENANT_ID': os.getenv('MICROSOFT_GRAPH_TENANT_ID'),
+}
+for var_name, var_value in critical_vars.items():
+    status = "✓" if var_value else "✗"
+    print(f"  {status} {var_name}: {'SET' if var_value else 'MISSING'}", flush=True)
+print("=" * 60, flush=True)
+
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
@@ -36,7 +50,7 @@ if website_hostname := os.getenv('WEBSITE_HOSTNAME'):
     ALLOWED_HOSTS.append(website_hostname)
 
 # Allow Azure's internal health check IPs (169.254.x.x range)
-ALLOWED_HOSTS.extend(['169.254.129.4', '169.254.129.1'])
+ALLOWED_HOSTS.extend(['169.254.129.4', '169.254.129.1', '169.254.130.4'])
 
 
 # Application definition
@@ -190,15 +204,32 @@ LOGIN_REDIRECT_URL = '/'
 LOGOUT_REDIRECT_URL = '/'
 
 # Social Auth Configuration for Azure AD SSO
-AUTHENTICATION_BACKENDS = [
-    'social_core.backends.azuread_tenant.AzureADTenantOAuth2',
-    'django.contrib.auth.backends.ModelBackend',  # Fallback for admin/superuser
-]
+# Only enable if all required environment variables are present
+MICROSOFT_GRAPH_CLIENT_ID = os.getenv('MICROSOFT_GRAPH_CLIENT_ID')
+MICROSOFT_GRAPH_CLIENT_SECRET = os.getenv('MICROSOFT_GRAPH_CLIENT_SECRET')
+MICROSOFT_GRAPH_TENANT_ID = os.getenv('MICROSOFT_GRAPH_TENANT_ID')
 
-# Azure AD SSO Settings
-SOCIAL_AUTH_AZUREAD_TENANT_OAUTH2_KEY = os.getenv('MICROSOFT_GRAPH_CLIENT_ID')
-SOCIAL_AUTH_AZUREAD_TENANT_OAUTH2_SECRET = os.getenv('MICROSOFT_GRAPH_CLIENT_SECRET')
-SOCIAL_AUTH_AZUREAD_TENANT_OAUTH2_TENANT_ID = os.getenv('MICROSOFT_GRAPH_TENANT_ID')
+if MICROSOFT_GRAPH_CLIENT_ID and MICROSOFT_GRAPH_CLIENT_SECRET and MICROSOFT_GRAPH_TENANT_ID:
+    print("✓ Microsoft Graph credentials found - SSO enabled", flush=True)
+    AUTHENTICATION_BACKENDS = [
+        'social_core.backends.azuread_tenant.AzureADTenantOAuth2',
+        'django.contrib.auth.backends.ModelBackend',  # Fallback for admin/superuser
+    ]
+    
+    # Azure AD SSO Settings
+    SOCIAL_AUTH_AZUREAD_TENANT_OAUTH2_KEY = MICROSOFT_GRAPH_CLIENT_ID
+    SOCIAL_AUTH_AZUREAD_TENANT_OAUTH2_SECRET = MICROSOFT_GRAPH_CLIENT_SECRET
+    SOCIAL_AUTH_AZUREAD_TENANT_OAUTH2_TENANT_ID = MICROSOFT_GRAPH_TENANT_ID
+else:
+    print("✗ Microsoft Graph credentials missing - SSO disabled, using only ModelBackend", flush=True)
+    AUTHENTICATION_BACKENDS = [
+        'django.contrib.auth.backends.ModelBackend',  # Only local auth
+    ]
+    
+    # Set dummy values to prevent errors if code tries to reference them
+    SOCIAL_AUTH_AZUREAD_TENANT_OAUTH2_KEY = None
+    SOCIAL_AUTH_AZUREAD_TENANT_OAUTH2_SECRET = None
+    SOCIAL_AUTH_AZUREAD_TENANT_OAUTH2_TENANT_ID = None
 
 # OAuth Scopes - request only what's needed
 SOCIAL_AUTH_AZUREAD_TENANT_OAUTH2_SCOPE = [

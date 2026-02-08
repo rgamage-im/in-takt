@@ -20,27 +20,12 @@ python manage.py migrate --noinput
 echo "Ensuring superuser exists..."
 python manage.py ensure_superuser
 
-# Test if Django can load (this will catch import errors)
-echo "Testing Django application load..."
-python -c "
-import sys
-import traceback
-try:
-    from config.wsgi import application
-    print('✓ Django application loads successfully')
-except Exception as e:
-    print('✗ CRITICAL ERROR loading Django:')
-    traceback.print_exc()
-    sys.exit(1)
-"
-
-# Start Gunicorn
-PORT="${WEBSITES_PORT:-8000}"
-echo "Starting Gunicorn on 0.0.0.0:$PORT..."
+# Start Gunicorn with Django app
+echo "Starting Gunicorn on 0.0.0.0:8000 with Django..."
 exec gunicorn config.wsgi:application \
-    --bind=0.0.0.0:$PORT \
-    --workers=4 \
-    --timeout=600 \
+    --bind=0.0.0.0:8000 \
+    --workers=2 \
+    --timeout=120 \
     --access-logfile=- \
     --error-logfile=- \
-    --log-level=info
+    --log-level=debug

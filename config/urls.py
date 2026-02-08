@@ -20,8 +20,12 @@ from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
 from core import views as core_views
+from core.health_views import health_check
 
 urlpatterns = [
+    # Health check endpoint (no auth required for Azure probes)
+    path("health/", health_check, name="health_check"),
+    
     # Home page
     path("", core_views.home, name="home"),
     

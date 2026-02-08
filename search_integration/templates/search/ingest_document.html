@@ -34,9 +34,7 @@
         </div>
 
         <form 
-            hx-post="{% url 'search:ingest_document' %}" 
-            hx-target="#ingest-result"
-            hx-indicator="#ingest-loading"
+            id="ingest-form"
             class="space-y-6">
             {% csrf_token %}
 
@@ -369,23 +367,62 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     // Form submission handling
-    const form = document.querySelector('form');
+    const form = document.getElementById('ingest-form');
     form.addEventListener('submit', function(e) {
-        // Check if we're in file upload mode and have a file
-        if (!textContentSection.classList.contains('hidden')) {
-            // Text mode - let HTMX handle it normally
-            return;
-        }
-        
-        if (!currentFile) {
-            e.preventDefault();
-            alert('Please select a file to upload');
-            return;
-        }
-        
-        // File upload mode - prevent default and use FormData
         e.preventDefault();
         
+        // Show loading indicator
+        document.getElementById('ingest-loading').style.display = 'flex';
+        
+        // Check if we're in file upload mode or text mode
+        if (fileUploadSection.classList.contains('hidden')) {
+            // Text mode
+            submitTextContent();
+        } else {
+            // File upload mode
+            if (!currentFile) {
+                document.getElementById('ingest-loading').style.display = 'none';
+                alert('Please select a file to upload');
+                return;
+            }
+            submitFileUpload();
+        }
+    });
+    
+    function submitTextContent() {
+        const formData = new FormData();
+        formData.append('content', contentTextarea.value);
+        formData.append('source_type', document.getElementById('source_type').value);
+        formData.append('file_name', fileNameInput.value);
+        formData.append('title', titleInput.value);
+        formData.append('author', document.getElementById('author').value);
+        
+        fetch('{% url "search:ingest_document" %}', {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+            },
+            body: formData
+        })
+        .then(response => response.text())
+        .then(html => {
+            document.getElementById('ingest-loading').style.display = 'none';
+            document.getElementById('ingest-result').innerHTML = html;
+            // Clear form after successful upload
+            form.reset();
+        })
+        .catch(error => {
+            document.getElementById('ingest-loading').style.display = 'none';
+            console.error('Error:', error);
+            document.getElementById('ingest-result').innerHTML = `
+                <div class="bg-red-50 border border-red-200 rounded-lg p-4">
+                    <p class="text-red-800">Ingestion failed: ${error.message}</p>
+                </div>
+            `;
+        });
+    }
+    
+    function submitFileUpload() {
         const formData = new FormData();
         formData.append('file', currentFile);
         
@@ -399,10 +436,6 @@ document.addEventListener('DOMContentLoaded', function() {
         };
         formData.append('metadata', JSON.stringify(metadata));
         
-        // Show loading indicator
-        document.getElementById('ingest-loading').style.display = 'flex';
-        
-        // Send via fetch (not HTMX) since we need multipart/form-data
         fetch('{% url "search:ingest_document_upload" %}', {
             method: 'POST',
             headers: {
@@ -427,7 +460,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 </div>
             `;
         });
-    });
+    }
 });
 </script>
 {% endblock %}

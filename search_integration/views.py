@@ -101,6 +101,7 @@ def search_documents(request):
     query = request.POST.get("query", "").strip()
     top_k = int(request.POST.get("top_k", 10))
     vector_weight = float(request.POST.get("vector_weight", 0.5))
+    use_reranking = request.POST.get("use_reranking", "false").lower() == "true"
     
     if not query:
         context = {
@@ -114,7 +115,8 @@ def search_documents(request):
         payload = {
             "query": query,
             "top_k": top_k,
-            "vector_weight": vector_weight
+            "vector_weight": vector_weight,
+            "use_reranking": use_reranking
         }
         
         # Add ACL filters using current user's email from Azure AD SSO
@@ -153,6 +155,7 @@ def search_documents(request):
             "results": data.get("results", []),
             "total_results": data.get("total_results", 0),
             "vector_weight": vector_weight,
+            "use_reranking": use_reranking,
             "error": None
         }
         

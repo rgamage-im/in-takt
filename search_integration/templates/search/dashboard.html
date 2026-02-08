@@ -186,6 +186,22 @@
                                 <span>Semantic (Vector)</span>
                             </div>
                         </div>
+
+                        <!-- Semantic Re-ranking Toggle -->
+                        <div class="flex items-center">
+                            <input
+                                type="checkbox"
+                                id="use_reranking"
+                                name="use_reranking"
+                                value="true"
+                                class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+                            <label for="use_reranking" class="ml-2 block text-sm font-medium" style="color: var(--color-deep-navy);">
+                                Enable Semantic Re-ranking
+                                <span class="block text-xs font-normal" style="color: var(--color-olive-gray);">
+                                    Uses cross-encoder model to improve result relevance
+                                </span>
+                            </label>
+                        </div>
                     </div>
                 </details>
 

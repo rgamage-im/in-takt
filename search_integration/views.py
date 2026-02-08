@@ -6,6 +6,9 @@ from django.conf import settings
 from django.views.decorators.http import require_http_methods
 from django.http import JsonResponse
 
+# RAG API timeout in seconds (search, ingest, and delete operations)
+RAG_API_TIMEOUT = 90
+
 
 @login_required
 @require_http_methods(["GET"])
@@ -145,7 +148,7 @@ def search_documents(request):
                 "Content-Type": "application/json"
             },
             json=payload,
-            timeout=30
+            timeout=RAG_API_TIMEOUT
         )
         response.raise_for_status()
         data = response.json()
@@ -265,7 +268,7 @@ def ingest_document(request):
                 "Content-Type": "application/json"
             },
             json=payload,
-            timeout=60
+            timeout=RAG_API_TIMEOUT
         )
         response.raise_for_status()
         data = response.json()
@@ -329,7 +332,7 @@ def delete_document(request):
             headers={
                 "X-API-Key": settings.RAG_API_KEY
             },
-            timeout=30
+            timeout=RAG_API_TIMEOUT
         )
         response.raise_for_status()
         data = response.json()

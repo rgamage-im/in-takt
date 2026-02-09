@@ -9,7 +9,8 @@ from .auth_views import (
     MyProfilePageView,
     GraphExploreView,
     TeamsMessagesTableView,
-    ExpenseReceiptsTableView
+    ExpenseReceiptsTableView,
+    TeamsWebhooksView
 )
 from .api_views import (
     MyProfileAPIView,
@@ -27,7 +28,13 @@ from .api_views import (
     SearchAllDrivesIncludingSharePointAPIView,
     ExpenseReceiptsAPIView,
     DownloadFileAPIView,
-    UploadReceiptToQuickBooksAPIView
+    UploadReceiptToQuickBooksAPIView,
+    # Webhook and subscription views
+    TeamsWebhookView,
+    CreateTeamsChannelSubscriptionAPIView,
+    ListSubscriptionsAPIView,
+    DeleteSubscriptionAPIView,
+    ListNotificationsAPIView
 )
 
 app_name = 'msgraph'
@@ -49,6 +56,9 @@ urlpatterns = [
 
     # Expense Receipts Table (HTML)
     path('receipts/expense/', ExpenseReceiptsTableView.as_view(), name='expense-receipts-table'),
+    
+    # Teams Webhooks Management (HTML)
+    path('webhooks/teams/', TeamsWebhooksView.as_view(), name='teams-webhooks'),
 
     # API Routes - Delegated Permissions (uses session token)
     path('api/me/', MyProfileAPIView.as_view(), name='api-my-profile'),
@@ -73,4 +83,13 @@ urlpatterns = [
     # Expense Receipts API
     path('api/receipts/expense/', ExpenseReceiptsAPIView.as_view(), name='api-expense-receipts'),
     path('api/receipts/upload-to-quickbooks/', UploadReceiptToQuickBooksAPIView.as_view(), name='api-upload-receipt-to-qb'),
+    
+    # Webhook endpoints (public - no auth required)
+    path('api/webhooks/teams/', TeamsWebhookView.as_view(), name='teams-webhook'),
+    
+    # Subscription management API (authenticated)
+    path('api/subscriptions/create/', CreateTeamsChannelSubscriptionAPIView.as_view(), name='create-subscription'),
+    path('api/subscriptions/', ListSubscriptionsAPIView.as_view(), name='list-subscriptions'),
+    path('api/subscriptions/<str:subscription_id>/delete/', DeleteSubscriptionAPIView.as_view(), name='delete-subscription'),
+    path('api/notifications/', ListNotificationsAPIView.as_view(), name='list-notifications'),
 ]

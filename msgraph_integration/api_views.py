@@ -1203,3 +1203,329 @@ class UploadReceiptToQuickBooksAPIView(APIView):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
+
+class TeamsWebhookView(APIView):
+    """
+    Webhook endpoint for Microsoft Graph change notifications.
+    
+    Handles both validation (GET) and notification delivery (POST).
+    """
+    permission_classes = []  # Public endpoint (Microsoft Graph needs to access it)
+    authentication_classes = []  # No authentication required for webhooks
+    
+    def get(self, request):
+        """
+        Handle webhook validation from Microsoft Graph.
+        Microsoft sends a validation token that must be returned in plain text.
+        """
+        validation_token = request.GET.get('validationToken')
+        
+        if validation_token:
+            # Return the validation token in plain text
+            return HttpResponse(validation_token, content_type='text/plain')
+        
+        return HttpResponse('Webhook endpoint is active', status=200)
+    
+    def post(self, request):
+        """
+        Handle incoming change notifications from Microsoft Graph.
+        """
+        from .models import GraphSubscription, TeamsWebhookNotification
+        import logging
+        
+        logger = logging.getLogger(__name__)
+        
+        try:
+            data = request.data
+            
+            # Microsoft sends an array of notifications in the 'value' field
+            notifications = data.get('value', [])
+            
+            logger.info(f"Received {len(notifications)} webhook notifications")
+            
+            processed_count = 0
+            
+            for notification in notifications:
+                try:
+                    subscription_id = notification.get('subscriptionId')
+                    client_state = notification.get('clientState')
+                    
+                    # Validate client state
+                    try:
+                        subscription = GraphSubscription.objects.get(
+                            subscription_id=subscription_id,
+                            status='active'
+                        )
+                        
+                        if subscription.client_state != client_state:
+                            logger.warning(f"Client state mismatch for subscription {subscription_id}")
+                            continue
+                    except GraphSubscription.DoesNotExist:
+                        logger.warning(f"Subscription {subscription_id} not found in database")
+                        # Still process the notification but without linking to subscription
+                        subscription = None
+                    
+                    # Extract notification details
+                    change_type = notification.get('changeType')
+                    resource = notification.get('resource')
+                    resource_data = notification.get('resourceData', {})
+                    resource_data_id = resource_data.get('id', resource_data.get('@odata.id', ''))
+                    tenant_id = notification.get('tenantId')
+                    
+                    # Parse Teams-specific info from resource path
+                    # Format: teams('team-id')/channels('channel-id')/messages('message-id')
+                    team_id = None
+                    channel_id = None
+                    message_id = None
+                    
+                    if resource and 'teams(' in resource:
+                        # Extract IDs from resource path
+                        import re
+                        team_match = re.search(r"teams\('([^']+)'\)", resource)
+                        channel_match = re.search(r"channels\('([^']+)'\)", resource)
+                        message_match = re.search(r"messages\('([^']+)'\)", resource)
+                        
+                        if team_match:
+                            team_id = team_match.group(1)
+                        if channel_match:
+                            channel_id = channel_match.group(1)
+                        if message_match:
+                            message_id = message_match.group(1)
+                    
+                    # Create notification record
+                    webhook_notification = TeamsWebhookNotification.objects.create(
+                        subscription=subscription,
+                        notification_id=notification.get('id', ''),
+                        graph_subscription_id=subscription_id,
+                        change_type=change_type,
+                        resource=resource,
+                        resource_data_id=resource_data_id,
+                        tenant_id=tenant_id,
+                        team_id=team_id,
+                        channel_id=channel_id,
+                        message_id=message_id,
+                        payload=notification,
+                        processed=False
+                    )
+                    
+                    logger.info(f"Stored notification {webhook_notification.id}: {change_type} - {resource_data_id}")
+                    processed_count += 1
+                    
+                except Exception as e:
+                    logger.error(f"Error processing notification: {str(e)}", exc_info=True)
+                    continue
+            
+            # Return 202 Accepted to Microsoft Graph
+            return Response({
+                'status': 'received',
+                'processed': processed_count
+            }, status=status.HTTP_202_ACCEPTED)
+            
+        except Exception as e:
+            logger.error(f"Error handling webhook: {str(e)}", exc_info=True)
+            # Return 200 even on error to prevent Microsoft from retrying excessively
+            return Response({
+                'status': 'error',
+                'message': str(e)
+            }, status=status.HTTP_200_OK)
+
+
+class CreateTeamsChannelSubscriptionAPIView(APIView):
+    """
+    Create a Microsoft Graph subscription for Teams channel messages.
+    """
+    permission_classes = [IsAuthenticated]
+    
+    @extend_schema(
+        request={
+            'application/json': {
+                'type': 'object',
+                'properties': {
+                    'team_id': {'type': 'string'},
+                    'channel_id': {'type': 'string'},
+                    'description': {'type': 'string'},
+                    'expiration_minutes': {'type': 'integer', 'default': 60}
+                },
+                'required': ['team_id', 'channel_id']
+            }
+        }
+    )
+    def post(self, request):
+        """
+        Create a subscription to receive notifications when messages are created/updated in a Teams channel.
+        """
+        from .models import GraphSubscription
+        from .services import GraphService
+        from django.conf import settings
+        
+        team_id = request.data.get('team_id')
+        channel_id = request.data.get('channel_id')
+        description = request.data.get('description', '')
+        expiration_minutes = request.data.get('expiration_minutes', 60)
+        
+        if not team_id or not channel_id:
+            return Response({
+                'error': 'team_id and channel_id are required'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            # Generate client state
+            client_state = GraphSubscription.generate_client_state()
+            
+            # Build notification URL (must be publicly accessible HTTPS)
+            # You'll need to configure this to your actual domain
+            base_url = settings.SITE_URL if hasattr(settings, 'SITE_URL') else request.build_absolute_uri('/')[:-1]
+            notification_url = f"{base_url}/api/msgraph/webhooks/teams/"
+            
+            # Create subscription via Microsoft Graph
+            graph_service = GraphService()
+            subscription_response = graph_service.create_teams_channel_subscription(
+                team_id=team_id,
+                channel_id=channel_id,
+                notification_url=notification_url,
+                client_state=client_state,
+                expiration_minutes=expiration_minutes
+            )
+            
+            # Store subscription in database
+            subscription = GraphSubscription.objects.create(
+                subscription_id=subscription_response['id'],
+                resource=subscription_response['resource'],
+                change_type=subscription_response['changeType'],
+                notification_url=subscription_response['notificationUrl'],
+                expiration_datetime=subscription_response['expirationDateTime'],
+                client_state=client_state,
+                team_id=team_id,
+                channel_id=channel_id,
+                description=description,
+                status='active'
+            )
+            
+            return Response({
+                'success': True,
+                'subscription': {
+                    'id': subscription.subscription_id,
+                    'resource': subscription.resource,
+                    'expires': subscription.expiration_datetime,
+                    'team_id': subscription.team_id,
+                    'channel_id': subscription.channel_id
+                }
+            }, status=status.HTTP_201_CREATED)
+            
+        except Exception as e:
+            return Response({
+                'error': f'Failed to create subscription: {str(e)}'
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class ListSubscriptionsAPIView(APIView):
+    """
+    List all active subscriptions.
+    """
+    permission_classes = [IsAuthenticated]
+    
+    def get(self, request):
+        """
+        Get all active subscriptions from the database.
+        """
+        from .models import GraphSubscription
+        
+        subscriptions = GraphSubscription.objects.filter(status='active').order_by('-created_at')
+        
+        data = []
+        for sub in subscriptions:
+            data.append({
+                'id': sub.subscription_id,
+                'resource': sub.resource,
+                'team_id': sub.team_id,
+                'channel_id': sub.channel_id,
+                'description': sub.description,
+                'expires': sub.expiration_datetime,
+                'is_expired': sub.is_expired(),
+                'created_at': sub.created_at
+            })
+        
+        return Response({
+            'subscriptions': data,
+            'count': len(data)
+        })
+
+
+class DeleteSubscriptionAPIView(APIView):
+    """
+    Delete a subscription.
+    """
+    permission_classes = [IsAuthenticated]
+    
+    def delete(self, request, subscription_id):
+        """
+        Delete a subscription from both Microsoft Graph and our database.
+        """
+        from .models import GraphSubscription
+        from .services import GraphService
+        
+        try:
+            subscription = GraphSubscription.objects.get(subscription_id=subscription_id)
+            
+            # Delete from Microsoft Graph
+            try:
+                graph_service = GraphService()
+                graph_service.delete_subscription(subscription_id)
+            except Exception as e:
+                # Log but continue - subscription might already be expired/deleted in Graph
+                pass
+            
+            # Update status in database
+            subscription.status = 'deleted'
+            subscription.save()
+            
+            return Response({
+                'success': True,
+                'message': 'Subscription deleted'
+            })
+            
+        except GraphSubscription.DoesNotExist:
+            return Response({
+                'error': 'Subscription not found'
+            }, status=status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            return Response({
+                'error': f'Failed to delete subscription: {str(e)}'
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class ListNotificationsAPIView(APIView):
+    """
+    List recent webhook notifications.
+    """
+    permission_classes = [IsAuthenticated]
+    
+    def get(self, request):
+        """
+        Get recent webhook notifications.
+        """
+        from .models import TeamsWebhookNotification
+        
+        limit = int(request.GET.get('limit', 50))
+        notifications = TeamsWebhookNotification.objects.all()[:limit]
+        
+        data = []
+        for notif in notifications:
+            data.append({
+                'id': notif.id,
+                'change_type': notif.change_type,
+                'resource': notif.resource,
+                'team_id': notif.team_id,
+                'channel_id': notif.channel_id,
+                'message_id': notif.message_id,
+                'received_at': notif.received_at,
+                'processed': notif.processed,
+                'payload': notif.payload
+            })
+        
+        return Response({
+            'notifications': data,
+            'count': len(data)
+        })
+
+

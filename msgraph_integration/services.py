@@ -144,3 +144,114 @@ class GraphService:
         """
         endpoint = f"/users?$filter=startswith(displayName,'{query}') or startswith(mail,'{query}')&$top={top}"
         return self._make_request(endpoint)
+    
+    def create_teams_channel_subscription(
+        self, 
+        team_id: str, 
+        channel_id: str, 
+        notification_url: str,
+        client_state: str,
+        expiration_minutes: int = 60,
+        change_types: str = "created,updated",
+        lifecycle_notification_url: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """
+        Create a subscription to receive notifications for Teams channel messages.
+        
+        Args:
+            team_id: The Teams team ID
+            channel_id: The channel ID within the team
+            notification_url: Your public HTTPS webhook endpoint URL
+            client_state: Secret token for validating notifications
+            expiration_minutes: Subscription duration in minutes (max 4230 = ~3 days)
+            change_types: Comma-separated: created, updated, deleted
+            lifecycle_notification_url: Optional endpoint for lifecycle notifications
+            
+        Returns:
+            Subscription object with id, expirationDateTime, etc.
+            
+        Permissions Required:
+            - ChannelMessage.Read.All (application permission)
+        """
+        from datetime import datetime, timedelta, timezone as dt_timezone
+        
+        # Calculate expiration (max 4230 minutes for channel messages)
+        expiration_datetime = datetime.now(dt_timezone.utc) + timedelta(minutes=min(expiration_minutes, 4230))
+        expiration_str = expiration_datetime.strftime('%Y-%m-%dT%H:%M:%S.0000000Z')
+        
+        resource = f"/teams/{team_id}/channels/{channel_id}/messages"
+        
+        subscription_data = {
+            "changeType": change_types,
+            "notificationUrl": notification_url,
+            "resource": resource,
+            "expirationDateTime": expiration_str,
+            "clientState": client_state,
+            "includeResourceData": False  # Set to True if you want encrypted message content
+        }
+        
+        # Add lifecycle notification URL if provided and expiration > 1 hour
+        if lifecycle_notification_url and expiration_minutes > 60:
+            subscription_data["lifecycleNotificationUrl"] = lifecycle_notification_url
+        
+        return self._make_request("/subscriptions", method="POST", data=subscription_data)
+    
+    def renew_subscription(self, subscription_id: str, expiration_minutes: int = 60) -> Dict[str, Any]:
+        """
+        Renew an existing subscription by updating its expiration date.
+        
+        Args:
+            subscription_id: The subscription ID to renew
+            expiration_minutes: Additional minutes to extend (max 4230)
+            
+        Returns:
+            Updated subscription object
+        """
+        from datetime import datetime, timedelta, timezone as dt_timezone
+        
+        expiration_datetime = datetime.now(dt_timezone.utc) + timedelta(minutes=min(expiration_minutes, 4230))
+        expiration_str = expiration_datetime.strftime('%Y-%m-%dT%H:%M:%S.0000000Z')
+        
+        update_data = {
+            "expirationDateTime": expiration_str
+        }
+        
+        return self._make_request(f"/subscriptions/{subscription_id}", method="PATCH", data=update_data)
+    
+    def delete_subscription(self, subscription_id: str) -> None:
+        """
+        Delete a subscription.
+        
+        Args:
+            subscription_id: The subscription ID to delete
+        """
+        token = self._get_access_token()
+        url = f"{self.graph_endpoint}/subscriptions/{subscription_id}"
+        
+        headers = {
+            'Authorization': f'Bearer {token}'
+        }
+        
+        response = requests.delete(url, headers=headers)
+        response.raise_for_status()
+    
+    def get_subscription(self, subscription_id: str) -> Dict[str, Any]:
+        """
+        Get details of an existing subscription.
+        
+        Args:
+            subscription_id: The subscription ID
+            
+        Returns:
+            Subscription object
+        """
+        return self._make_request(f"/subscriptions/{subscription_id}")
+    
+    def list_subscriptions(self) -> Dict[str, Any]:
+        """
+        List all active subscriptions for this application.
+        
+        Returns:
+            List of subscription objects
+        """
+        return self._make_request("/subscriptions")

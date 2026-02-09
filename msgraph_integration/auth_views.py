@@ -193,3 +193,16 @@ class ExpenseReceiptsTableView(View):
         # Render the template - Tabulator will fetch data via AJAX
         return render(request, 'msgraph/expense_receipts.html')
 
+
+@method_decorator(login_required, name='dispatch')
+class TeamsWebhooksView(View):
+    """
+    Display Teams webhook subscription management page
+    Requires Django authentication
+    """
+
+    def get(self, request):
+        """
+        Show Teams webhooks management page
+        """
+        return render(request, 'msgraph/teams_webhooks.html')

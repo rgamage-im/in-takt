@@ -66,7 +66,16 @@ class GraphService:
         url = f"{self.graph_endpoint}{endpoint}"
         
         response = requests.request(method, url, headers=headers, json=data)
-        response.raise_for_status()
+        
+        if not response.ok:
+            error_detail = response.text
+            try:
+                error_json = response.json()
+                error_detail = error_json.get('error', {}).get('message', error_detail)
+            except:
+                pass
+            logger.error(f"Graph API {method} {url} failed: {response.status_code} - {error_detail}")
+            response.raise_for_status()
         
         return response.json()
     

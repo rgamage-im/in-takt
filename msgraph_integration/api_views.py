@@ -1357,6 +1357,10 @@ class CreateTeamsChannelSubscriptionAPIView(APIView):
         from .models import GraphSubscription
         from .services import GraphService
         from django.conf import settings
+        import requests
+        import logging
+        
+        logger = logging.getLogger(__name__)
         
         team_id = request.data.get('team_id')
         channel_id = request.data.get('channel_id')
@@ -1412,7 +1416,20 @@ class CreateTeamsChannelSubscriptionAPIView(APIView):
                 }
             }, status=status.HTTP_201_CREATED)
             
+        except requests.exceptions.HTTPError as e:
+            error_detail = str(e)
+            if hasattr(e, 'response') and e.response is not None:
+                try:
+                    error_json = e.response.json()
+                    error_detail = error_json.get('error', {}).get('message', str(e))
+                except:
+                    error_detail = e.response.text or str(e)
+            logger.error(f"Failed to create subscription: {error_detail}")
+            return Response({
+                'error': f'Failed to create subscription: {error_detail}'
+            }, status=status.HTTP_400_BAD_REQUEST)
         except Exception as e:
+            logger.error(f"Failed to create subscription: {str(e)}")
             return Response({
                 'error': f'Failed to create subscription: {str(e)}'
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

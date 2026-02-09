@@ -110,8 +110,10 @@ print(response.json())
 
 ### Finding Team and Channel IDs
 
-#### Team Id = 19%3A9T-mYfQRqgAOqz2zBGVpXOchZq3GSWO4z5R9-YQ3-Jc1%40thread.tacv2
-#### Foundations channel id = 19:cedb5b3e12ef4358a9668550c0667991@thread.tacv2
+#### Example IDs for IM Consulting Team:
+- **Team ID** (groupId from URL): `64fea8d6-c5d6-4c47-8c4b-226cf6924972`
+- **Foundations Channel ID**: `19:cedb5b3e12ef4358a9668550c0667991@thread.tacv2`
+- **Team URL**: https://teams.microsoft.com/l/team/19%3A9T-mYfQRqgAOqz2zBGVpXOchZq3GSWO4z5R9-YQ3-Jc1%40thread.tacv2/conversations?groupId=64fea8d6-c5d6-4c47-8c4b-226cf6924972&tenantId=66f459cf-d8c4-49ee-a087-43b80e9c8176
 
 #### Method 1: Microsoft Graph Explorer
 1. Go to https://developer.microsoft.com/graph/graph-explorer

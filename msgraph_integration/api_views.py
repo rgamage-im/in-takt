@@ -1242,11 +1242,20 @@ class TeamsWebhookView(APIView):
     def post(self, request):
         """
         Handle incoming change notifications from Microsoft Graph.
+        Also handles validation requests sent via POST (Microsoft sometimes uses POST with validationToken).
         """
         from .models import GraphSubscription, TeamsWebhookNotification
         import logging
         
         logger = logging.getLogger(__name__)
+        
+        # Check if this is a validation request (POST with validationToken in query string)
+        validation_token = request.GET.get('validationToken')
+        if validation_token:
+            logger.info(f"Webhook POST validation request received from {request.META.get('REMOTE_ADDR')}")
+            logger.info(f"Validation token length: {len(validation_token)}")
+            logger.info(f"Returning validation token with 200 OK")
+            return HttpResponse(validation_token, content_type='text/plain', status=200)
         
         try:
             data = request.data

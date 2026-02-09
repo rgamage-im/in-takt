@@ -1221,12 +1221,22 @@ class TeamsWebhookView(APIView):
         Handle webhook validation from Microsoft Graph.
         Microsoft sends a validation token that must be returned in plain text.
         """
+        import logging
+        logger = logging.getLogger(__name__)
+        
         validation_token = request.GET.get('validationToken')
         
-        if validation_token:
-            # Return the validation token in plain text
-            return HttpResponse(validation_token, content_type='text/plain')
+        logger.info(f"Webhook GET request received from {request.META.get('REMOTE_ADDR')}")
+        logger.info(f"Validation token present: {bool(validation_token)}")
+        logger.info(f"Full request path: {request.get_full_path()}")
+        logger.info(f"Query params: {dict(request.GET)}")
         
+        if validation_token:
+            logger.info(f"Returning validation token (length: {len(validation_token)})")
+            # Return the validation token in plain text
+            return HttpResponse(validation_token, content_type='text/plain', status=200)
+        
+        logger.info("No validation token, returning status message")
         return HttpResponse('Webhook endpoint is active', status=200)
     
     def post(self, request):
@@ -1380,9 +1390,17 @@ class CreateTeamsChannelSubscriptionAPIView(APIView):
             client_state = GraphSubscription.generate_client_state()
             
             # Build notification URL (must be publicly accessible HTTPS)
-            # You'll need to configure this to your actual domain
             base_url = settings.SITE_URL if hasattr(settings, 'SITE_URL') else request.build_absolute_uri('/')[:-1]
             notification_url = f"{base_url}/graph/api/webhooks/teams/"
+            
+            # Log subscription details for debugging
+            logger.info(f"Creating Teams channel subscription:")
+            logger.info(f"  Team ID: {team_id}")
+            logger.info(f"  Channel ID: {channel_id}")
+            logger.info(f"  Notification URL: {notification_url}")
+            logger.info(f"  Base URL (SITE_URL): {base_url}")
+            logger.info(f"  Request host: {request.get_host()}")
+            logger.info(f"  Expiration minutes: {expiration_minutes}")
             
             # Create subscription via Microsoft Graph
             graph_service = GraphService()
@@ -1393,6 +1411,8 @@ class CreateTeamsChannelSubscriptionAPIView(APIView):
                 client_state=client_state,
                 expiration_minutes=expiration_minutes
             )
+            
+            logger.info(f"Subscription created successfully: {subscription_response.get('id')}")
             
             # Store subscription in database
             subscription = GraphSubscription.objects.create(
@@ -1427,12 +1447,27 @@ class CreateTeamsChannelSubscriptionAPIView(APIView):
                     error_detail = error_json.get('error', {}).get('message', str(e))
                 except:
                     error_detail = e.response.text or str(e)
+            
             logger.error(f"Failed to create subscription: {error_detail}")
+            logger.error(f"Notification URL that was used: {notification_url}")
+            
             return Response({
-                'error': f'Failed to create subscription: {error_detail}'
+                'error': f'Failed to create subscription: {error_detail}',
+                'notification_url': notification_url,
+                'debug_info': {
+                    'base_url': base_url,
+                    'site_url_setting': getattr(settings, 'SITE_URL', 'NOT_SET'),
+                    'request_host': request.get_host()
+                }
             }, status=status.HTTP_400_BAD_REQUEST)
         except Exception as e:
             logger.error(f"Failed to create subscription: {str(e)}")
+            logger.error(f"Notification URL that was used: {notification_url if 'notification_url' in locals() else 'NOT_SET'}")
+            
+            return Response({
+                'error': f'Failed to create subscription: {str(e)}',
+                'notification_url': notification_url if 'notification_url' in locals() else None
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
             return Response({
                 'error': f'Failed to create subscription: {str(e)}'
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

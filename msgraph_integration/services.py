@@ -206,6 +206,13 @@ class GraphService:
         if lifecycle_notification_url and expiration_minutes > 60:
             subscription_data["lifecycleNotificationUrl"] = lifecycle_notification_url
         
+        logger.info(f"Sending subscription request to Microsoft Graph:")
+        logger.info(f"  POST /subscriptions")
+        logger.info(f"  Resource: {resource}")
+        logger.info(f"  Notification URL: {notification_url}")
+        logger.info(f"  Change types: {change_types}")
+        logger.info(f"  Expiration: {expiration_str}")
+        
         return self._make_request("/subscriptions", method="POST", data=subscription_data)
     
     def renew_subscription(self, subscription_id: str, expiration_minutes: int = 60) -> Dict[str, Any]:

@@ -11,6 +11,8 @@ from rest_framework.permissions import IsAuthenticated
 from drf_spectacular.utils import extend_schema, OpenApiParameter
 from drf_spectacular.types import OpenApiTypes
 from django.http import HttpResponse
+from django.views.decorators.csrf import csrf_exempt
+from django.utils.decorators import method_decorator
 
 from .services_delegated import GraphServiceDelegated
 from .serializers import UserProfileSerializer
@@ -1204,6 +1206,7 @@ class UploadReceiptToQuickBooksAPIView(APIView):
             )
 
 
+@method_decorator(csrf_exempt, name='dispatch')
 class TeamsWebhookView(APIView):
     """
     Webhook endpoint for Microsoft Graph change notifications.

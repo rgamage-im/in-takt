@@ -52,6 +52,14 @@ if website_hostname := os.getenv('WEBSITE_HOSTNAME'):
 # Allow Azure's internal health check IPs (169.254.x.x range)
 ALLOWED_HOSTS.extend(['169.254.129.4', '169.254.129.1', '169.254.130.4'])
 
+# Site URL for webhooks and absolute URLs
+# Prioritize environment variable, then Azure hostname, then localhost for dev
+SITE_URL = os.getenv('SITE_URL')
+if not SITE_URL and (website_hostname := os.getenv('WEBSITE_HOSTNAME')):
+    SITE_URL = f"https://{website_hostname}"
+if not SITE_URL:
+    SITE_URL = "http://localhost:8000"
+
 
 # Application definition
 

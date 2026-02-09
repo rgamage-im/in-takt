@@ -3,9 +3,12 @@ Microsoft Graph API Service
 Handles authentication and API calls to Microsoft Graph
 """
 import os
+import logging
 from typing import Optional, Dict, Any
 from msal import ConfidentialClientApplication
 import requests
+
+logger = logging.getLogger(__name__)
 
 
 class GraphService:

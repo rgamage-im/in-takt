@@ -1206,15 +1206,18 @@ class UploadReceiptToQuickBooksAPIView(APIView):
             )
 
 
+from django.views import View
+from django.http import JsonResponse
+import json
+
 @method_decorator(csrf_exempt, name='dispatch')
-class TeamsWebhookView(APIView):
+class TeamsWebhookView(View):
     """
     Webhook endpoint for Microsoft Graph change notifications.
     
     Handles both validation (GET) and notification delivery (POST).
+    Uses plain Django View instead of DRF APIView to avoid content negotiation issues.
     """
-    permission_classes = []  # Public endpoint (Microsoft Graph needs to access it)
-    authentication_classes = []  # No authentication required for webhooks
     
     def get(self, request):
         """
@@ -1258,7 +1261,8 @@ class TeamsWebhookView(APIView):
             return HttpResponse(validation_token, content_type='text/plain', status=200)
         
         try:
-            data = request.data
+            # Parse JSON body from Django request
+            data = json.loads(request.body.decode('utf-8')) if request.body else {}
             
             # Microsoft sends an array of notifications in the 'value' field
             notifications = data.get('value', [])
@@ -1338,18 +1342,18 @@ class TeamsWebhookView(APIView):
                     continue
             
             # Return 202 Accepted to Microsoft Graph
-            return Response({
+            return JsonResponse({
                 'status': 'received',
                 'processed': processed_count
-            }, status=status.HTTP_202_ACCEPTED)
+            }, status=202)
             
         except Exception as e:
             logger.error(f"Error handling webhook: {str(e)}", exc_info=True)
             # Return 200 even on error to prevent Microsoft from retrying excessively
-            return Response({
+            return JsonResponse({
                 'status': 'error',
                 'message': str(e)
-            }, status=status.HTTP_200_OK)
+            }, status=200)
 
 
 class CreateTeamsChannelSubscriptionAPIView(APIView):

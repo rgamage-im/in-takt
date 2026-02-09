@@ -1375,7 +1375,7 @@ class CreateTeamsChannelSubscriptionAPIView(APIView):
             # Build notification URL (must be publicly accessible HTTPS)
             # You'll need to configure this to your actual domain
             base_url = settings.SITE_URL if hasattr(settings, 'SITE_URL') else request.build_absolute_uri('/')[:-1]
-            notification_url = f"{base_url}/api/msgraph/webhooks/teams/"
+            notification_url = f"{base_url}/graph/api/webhooks/teams/"
             
             # Create subscription via Microsoft Graph
             graph_service = GraphService()

@@ -18,19 +18,19 @@ The Teams webhook subscription system allows you to:
    - `GraphSubscription`: Stores active subscriptions with metadata
    - `TeamsWebhookNotification`: Logs all incoming webhook notifications
 
-2. **Webhook Endpoint** (`/api/msgraph/api/webhooks/teams/`):
+2. **Webhook Endpoint** (`/graph/api/webhooks/teams/`):
    - Public endpoint (no authentication) for Microsoft Graph to send notifications
    - Handles validation tokens (GET) and notification payloads (POST)
    - Validates client state for security
    - Parses Teams-specific information from resource paths
 
 3. **Subscription Management API**:
-   - `POST /api/msgraph/api/subscriptions/create/` - Create new subscription
-   - `GET /api/msgraph/api/subscriptions/` - List active subscriptions
-   - `DELETE /api/msgraph/api/subscriptions/{id}/delete/` - Delete subscription
-   - `GET /api/msgraph/api/notifications/` - List recent notifications
+   - `POST /graph/api/subscriptions/create/` - Create new subscription
+   - `GET /graph/api/subscriptions/` - List active subscriptions
+   - `DELETE /graph/api/subscriptions/{id}/delete/` - Delete subscription
+   - `GET /graph/api/notifications/` - List recent notifications
 
-4. **UI** (`/api/msgraph/webhooks/teams/`):
+4. **UI** (`/graph/webhooks/teams/`):
    - Web interface to create and manage subscriptions
    - View active subscriptions and their expiration dates
    - Monitor recent notifications in real-time
@@ -79,7 +79,7 @@ The Teams webhook subscription system allows you to:
 
 #### Via UI:
 
-1. Navigate to **Teams Webhooks** page: `/api/msgraph/webhooks/teams/`
+1. Navigate to **Teams Webhooks** page: `/graph/webhooks/teams/` (or click "Teams Webhooks" in the main navigation)
 2. Fill in the form:
    - **Team ID**: The GUID of the Teams team
    - **Channel ID**: The GUID of the channel within that team
@@ -110,9 +110,8 @@ print(response.json())
 
 ### Finding Team and Channel IDs
 
-https://teams.microsoft.com/l/channel/19%3Acedb5b3e12ef4358a9668550c0667991%40thread.tacv2/Foundations?groupId=64fea8d6-c5d6-4c47-8c4b-226cf6924972&tenantId=66f459cf-d8c4-49ee-a087-43b80e9c8176
-
-channel id = 19:cedb5b3e12ef4358a9668550c0667991
+#### Team Id = 19%3A9T-mYfQRqgAOqz2zBGVpXOchZq3GSWO4z5R9-YQ3-Jc1%40thread.tacv2
+#### Foundations channel id = 19:cedb5b3e12ef4358a9668550c0667991@thread.tacv2
 
 #### Method 1: Microsoft Graph Explorer
 1. Go to https://developer.microsoft.com/graph/graph-explorer
@@ -140,8 +139,8 @@ When a message is created/updated in the subscribed channel, Microsoft Graph sen
 4. **Logged**: Event is logged for debugging
 
 Access notifications:
-- **UI**: Real-time updates on the Teams Webhooks page
-- **API**: `GET /api/msgraph/api/notifications/?limit=50`
+- **UI**: Real-time updates on the Teams Webhooks page (`/graph/webhooks/teams/`)
+- **API**: `GET /graph/api/notifications/?limit=50`
 - **Django Admin**: Navigate to `msgraph_integration > Teams Webhook Notifications`
 
 ### Notification Payload Example
@@ -251,7 +250,7 @@ The webhook endpoint is intentionally public (no authentication) because:
 ### Health Checks
 Monitor webhook endpoint health:
 ```bash
-curl https://yourdomain.com/api/msgraph/api/webhooks/teams/
+curl https://yourdomain.com/graph/api/webhooks/teams/
 # Response: "Webhook endpoint is active"
 ```
 
@@ -284,7 +283,7 @@ Access full notification history and subscription details:
 
 1. **Check subscription status**: Should be "Active" in UI
 2. **Check expiration**: Subscriptions expire after configured time
-3. **Test endpoint**: `GET https://yourdomain.com/api/msgraph/api/webhooks/teams/`
+3. **Test endpoint**: `GET https://yourdomain.com/graph/api/webhooks/teams/`
 4. **Check logs**: Look for validation errors or timeouts
 5. **Verify client state**: Check database for correct token
 
@@ -299,7 +298,7 @@ View raw notifications in Django admin to debug payload structure.
 
 ## API Reference
 
-### POST /api/msgraph/api/subscriptions/create/
+### POST /graph/api/subscriptions/create/
 Create a new subscription.
 
 **Request**:
@@ -326,7 +325,7 @@ Create a new subscription.
 }
 ```
 
-### GET /api/msgraph/api/subscriptions/
+### GET /graph/api/subscriptions/
 List all active subscriptions.
 
 **Response**:
@@ -348,7 +347,7 @@ List all active subscriptions.
 }
 ```
 
-### DELETE /api/msgraph/api/subscriptions/{id}/delete/
+### DELETE /graph/api/subscriptions/{id}/delete/
 Delete a subscription.
 
 **Response**:
@@ -359,7 +358,7 @@ Delete a subscription.
 }
 ```
 
-### GET /api/msgraph/api/notifications/?limit=50
+### GET /graph/api/notifications/?limit=50
 List recent notifications.
 
 **Response**:

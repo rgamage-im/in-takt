@@ -12,7 +12,9 @@ A complete Microsoft Graph webhook subscription system for Microsoft Teams chann
 
 ## Access the Feature
 
-**URL**: https://in-takt.azurewebsites.net/api/msgraph/webhooks/teams/
+**URL**: https://in-takt.azurewebsites.net/graph/webhooks/teams/
+
+**Navigation**: Click "Teams Webhooks" in the main menu
 
 ## Testing Steps
 
@@ -80,13 +82,13 @@ curl https://in-takt.azurewebsites.net/api/msgraph/api/subscriptions/
 
 ### Check if endpoint is accessible:
 ```bash
-curl https://in-takt.azurewebsites.net/api/msgraph/api/webhooks/teams/
+curl https://in-takt.azurewebsites.net/graph/api/webhooks/teams/
 ```
 Expected response: `Webhook endpoint is active`
 
 ### Test validation token (simulating Microsoft Graph):
 ```bash
-curl "https://in-takt.azurewebsites.net/api/msgraph/api/webhooks/teams/?validationToken=test123"
+curl "https://in-takt.azurewebsites.net/graph/api/webhooks/teams/?validationToken=test123"
 ```
 Expected response: `test123` (in plain text)
 
@@ -171,7 +173,7 @@ if change_type == 'created' and message_id:
 ## Monitoring
 
 **Real-time UI**: 
-- https://in-takt.azurewebsites.net/api/msgraph/webhooks/teams/
+- https://in-takt.azurewebsites.net/graph/webhooks/teams/
 - Auto-refreshes notifications every 30 seconds
 
 **Django Admin**:
@@ -179,8 +181,8 @@ if change_type == 'created' and message_id:
 - Notifications: /admin/msgraph_integration/teamswebhooknotification/
 
 **API Endpoints**:
-- List subscriptions: `GET /api/msgraph/api/subscriptions/`
-- List notifications: `GET /api/msgraph/api/notifications/?limit=50`
+- List subscriptions: `GET /graph/api/subscriptions/`
+- List notifications: `GET /graph/api/notifications/?limit=50`
 
 ## Files Modified/Created
 

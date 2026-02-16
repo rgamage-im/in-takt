@@ -70,7 +70,10 @@ class GraphCallbackView(View):
             # Clean up state
             del request.session['oauth_state']
             
-            # Redirect to profile page or home
+            # Redirect to intended page or profile page as default
+            next_url = request.session.pop('graph_next', None)
+            if next_url:
+                return redirect(next_url)
             return redirect('msgraph:my-profile-page')
             
         except Exception as e:
@@ -106,19 +109,25 @@ class MyProfilePageView(View):
         """
         access_token = request.session.get('graph_access_token')
         
+        # If no access token, redirect to login
+        if not access_token:
+            request.session['graph_next'] = request.path
+            return redirect('msgraph:graph-login')
+        
         context = {
-            'is_authenticated': bool(access_token),
+            'is_authenticated': True,
         }
         
-        if access_token:
-            try:
-                graph_service = GraphServiceDelegated()
-                profile = graph_service.get_my_profile(access_token)
-                context['user_profile'] = profile  # Changed from 'profile' to 'user_profile'
-            except Exception as e:
-                context['error'] = str(e)
-                # Token might be expired, clear it
-                request.session.pop('graph_access_token', None)
+        try:
+            graph_service = GraphServiceDelegated()
+            profile = graph_service.get_my_profile(access_token)
+            context['user_profile'] = profile
+        except Exception as e:
+            context['error'] = str(e)
+            # Token might be expired, clear it and redirect to login
+            request.session.pop('graph_access_token', None)
+            request.session['graph_next'] = request.path
+            return redirect('msgraph:graph-login')
         
         return render(request, 'msgraph/profile.html', context)
 

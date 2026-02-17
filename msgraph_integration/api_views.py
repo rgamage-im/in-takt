@@ -854,6 +854,137 @@ class SearchAllDrivesIncludingSharePointAPIView(APIView):
             )
 
 
+class GlobalSearchAPIView(APIView):
+    """
+    Perform global search across Microsoft 365 using the Search API
+    """
+    permission_classes = [IsAuthenticated]
+    
+    @extend_schema(
+        summary="Global Microsoft 365 Search",
+        description="""
+        Perform a comprehensive search across Microsoft 365 using the Search API.
+        
+        This searches across multiple entity types:
+        - **driveItem**: Files in OneDrive and SharePoint
+        - **listItem**: SharePoint list items
+        - **site**: SharePoint sites
+        
+        This is more powerful than the individual search endpoints as it:
+        - Uses Microsoft's unified search engine
+        - Returns ranked results across all sources
+        - Supports advanced query syntax
+        - Includes relevance scoring
+        
+        Query parameters:
+        - `q`: Search query string (required, e.g., "project phoenix")
+        - `entity_types`: Comma-separated list of entity types to search (optional, default: "driveItem,listItem,site")
+        - `from`: Starting index for pagination (optional, default: 0)
+        - `size`: Number of results to return (optional, default: 25, max: 1000)
+        
+        Example: `/api/search/global/?q=project%20phoenix&size=50`
+        """,
+        parameters=[
+            OpenApiParameter(
+                name='q',
+                type=OpenApiTypes.STR,
+                location=OpenApiParameter.QUERY,
+                description='Search query string (e.g., "project phoenix")',
+                required=True,
+            ),
+            OpenApiParameter(
+                name='entity_types',
+                type=OpenApiTypes.STR,
+                location=OpenApiParameter.QUERY,
+                description='Comma-separated entity types: driveItem, listItem, site (default: all three)',
+                required=False,
+            ),
+            OpenApiParameter(
+                name='from',
+                type=OpenApiTypes.INT,
+                location=OpenApiParameter.QUERY,
+                description='Starting index for pagination (default: 0)',
+                required=False,
+            ),
+            OpenApiParameter(
+                name='size',
+                type=OpenApiTypes.INT,
+                location=OpenApiParameter.QUERY,
+                description='Number of results to return (default: 25, max: 1000)',
+                required=False,
+            ),
+        ],
+        responses={200: dict},
+        tags=['Microsoft Graph - Search']
+    )
+    def get(self, request):
+        """
+        Execute global search across Microsoft 365
+        """
+        access_token = request.session.get('graph_access_token')
+        
+        if not access_token:
+            return Response(
+                {'error': 'Not authenticated with Microsoft', 'login_url': '/graph/login/'},
+                status=status.HTTP_401_UNAUTHORIZED
+            )
+        
+        query = request.query_params.get('q')
+        if not query:
+            return Response(
+                {'error': 'Missing required parameter: q (search query)'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            # Parse entity types
+            entity_types_str = request.query_params.get('entity_types', 'driveItem,listItem,site')
+            entity_types = [et.strip() for et in entity_types_str.split(',') if et.strip()]
+            
+            # Validate entity types
+            valid_types = {'driveItem', 'listItem', 'site', 'list', 'message', 'event', 'person'}
+            invalid_types = set(entity_types) - valid_types
+            if invalid_types:
+                return Response(
+                    {'error': f'Invalid entity types: {", ".join(invalid_types)}. Valid types: {", ".join(valid_types)}'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Parse pagination parameters
+            from_index = int(request.query_params.get('from', 0))
+            size = int(request.query_params.get('size', 25))
+            
+            # Validate size
+            if size < 1 or size > 1000:
+                return Response(
+                    {'error': 'size must be between 1 and 1000'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Execute search
+            graph_service = GraphServiceDelegated()
+            results = graph_service.global_search(
+                access_token, 
+                query, 
+                entity_types=entity_types,
+                from_index=from_index,
+                size=size
+            )
+            
+            return Response(results, status=status.HTTP_200_OK)
+            
+        except ValueError as e:
+            return Response(
+                {'error': f'Invalid parameter value: {str(e)}'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        except Exception as e:
+            return Response(
+                {'error': str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+
 class ExpenseReceiptsAPIView(APIView):
     """
     Get expense receipts from SharePoint folder

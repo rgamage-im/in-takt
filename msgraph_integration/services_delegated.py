@@ -785,4 +785,49 @@ class GraphServiceDelegated:
         response.raise_for_status()
         
         return response.content
+    
+    def global_search(
+        self,
+        access_token: str,
+        query: str,
+        entity_types: Optional[list] = None,
+        from_index: int = 0,
+        size: int = 25
+    ) -> Dict[str, Any]:
+        """
+        Perform a global search across Microsoft 365 using the Search API
+        
+        This searches across multiple entity types (driveItem, listItem, site)
+        and returns unified results from all sources.
+        
+        Args:
+            access_token: User's access token
+            query: Search query string (e.g., "project phoenix")
+            entity_types: List of entity types to search (default: ["driveItem", "listItem", "site"])
+            from_index: Starting index for pagination (default: 0)
+            size: Number of results to return per entity type (default: 25, max: 1000)
+            
+        Returns:
+            Search results from Microsoft Graph Search API
+        """
+        if entity_types is None:
+            entity_types = ["driveItem", "listItem", "site"]
+        
+        # Construct the search request payload
+        request_body = {
+            "requests": [
+                {
+                    "entityTypes": entity_types,
+                    "query": {
+                        "queryString": query
+                    },
+                    "from": from_index,
+                    "size": size
+                }
+            ]
+        }
+        
+        # Make POST request to search/query endpoint
+        endpoint = "/search/query"
+        return self._make_request(endpoint, access_token, method="POST", data=request_body)
 

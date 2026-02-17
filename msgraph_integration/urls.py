@@ -26,6 +26,7 @@ from .api_views import (
     SharePointSitesAPIView,
     AllAccessibleDrivesAPIView,
     SearchAllDrivesIncludingSharePointAPIView,
+    GlobalSearchAPIView,
     ExpenseReceiptsAPIView,
     DownloadFileAPIView,
     UploadReceiptToQuickBooksAPIView,
@@ -79,6 +80,9 @@ urlpatterns = [
     path('api/sharepoint/sites/', SharePointSitesAPIView.as_view(), name='api-sharepoint-sites'),
     path('api/drives/all/', AllAccessibleDrivesAPIView.as_view(), name='api-all-drives'),
     path('api/drives/search-all/', SearchAllDrivesIncludingSharePointAPIView.as_view(), name='api-search-all-drives'),
+    
+    # Global Search API
+    path('api/search/global/', GlobalSearchAPIView.as_view(), name='api-global-search'),
     
     # Expense Receipts API
     path('api/receipts/expense/', ExpenseReceiptsAPIView.as_view(), name='api-expense-receipts'),

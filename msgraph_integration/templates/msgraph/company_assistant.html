@@ -1,0 +1,442 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Company Assistant - In-Takt{% endblock %}
+
+{% block extra_css %}
+<style>
+    .search-container {
+        max-width: 800px;
+        margin: 0 auto;
+    }
+    
+    .search-input-wrapper {
+        position: relative;
+        margin-bottom: 2rem;
+    }
+    
+    .search-input {
+        width: 100%;
+        padding: 1rem 3rem 1rem 1rem;
+        font-size: 1.1rem;
+        border: 2px solid var(--color-soft-sky-blue);
+        border-radius: 0.5rem;
+        transition: all 0.3s ease;
+    }
+    
+    .search-input:focus {
+        outline: none;
+        border-color: var(--color-warm-brick);
+        box-shadow: 0 0 0 3px rgba(193, 78, 50, 0.1);
+    }
+    
+    .search-button {
+        position: absolute;
+        right: 0.5rem;
+        top: 50%;
+        transform: translateY(-50%);
+        background-color: var(--color-warm-brick);
+        color: white;
+        border: none;
+        border-radius: 0.375rem;
+        padding: 0.5rem 1rem;
+        cursor: pointer;
+        transition: background-color 0.2s;
+    }
+    
+    .search-button:hover:not(:disabled) {
+        background-color: #a94e35;
+    }
+    
+    .search-button:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+    }
+    
+    .spinner {
+        border: 2px solid var(--color-light-sand);
+        border-top: 2px solid var(--color-warm-brick);
+        border-radius: 50%;
+        width: 20px;
+        height: 20px;
+        animation: spin 1s linear infinite;
+        display: inline-block;
+    }
+    
+    @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+    
+    .results-section {
+        display: none;
+        margin-top: 2rem;
+    }
+    
+    .results-section.visible {
+        display: block;
+    }
+    
+    .result-category {
+        background: white;
+        border-radius: 0.5rem;
+        padding: 1.5rem;
+        margin-bottom: 1.5rem;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+    
+    .result-category-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 1rem;
+        padding-bottom: 0.75rem;
+        border-bottom: 2px solid var(--color-light-sand);
+    }
+    
+    .result-category-title {
+        font-size: 1.25rem;
+        font-weight: 600;
+        color: var(--color-deep-navy);
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+    
+    .result-count {
+        background-color: var(--color-warm-brick);
+        color: white;
+        padding: 0.25rem 0.75rem;
+        border-radius: 1rem;
+        font-size: 0.875rem;
+        font-weight: 600;
+    }
+    
+    .result-item {
+        padding: 1rem;
+        border-left: 3px solid var(--color-soft-sky-blue);
+        background-color: #f8f9fa;
+        margin-bottom: 0.75rem;
+        border-radius: 0.25rem;
+        transition: all 0.2s;
+    }
+    
+    .result-item:hover {
+        background-color: #e9ecef;
+        border-left-color: var(--color-warm-brick);
+    }
+    
+    .result-title {
+        font-weight: 600;
+        color: var(--color-deep-navy);
+        margin-bottom: 0.5rem;
+    }
+    
+    .result-title a {
+        color: var(--color-deep-navy);
+        text-decoration: none;
+    }
+    
+    .result-title a:hover {
+        color: var(--color-warm-brick);
+        text-decoration: underline;
+    }
+    
+    .result-meta {
+        font-size: 0.875rem;
+        color: #6c757d;
+        margin-bottom: 0.5rem;
+    }
+    
+    .result-summary {
+        font-size: 0.9rem;
+        color: #495057;
+        line-height: 1.5;
+    }
+    
+    .no-results {
+        text-align: center;
+        padding: 2rem;
+        color: #6c757d;
+    }
+    
+    .error-message {
+        background-color: #f8d7da;
+        color: #721c24;
+        padding: 1rem;
+        border-radius: 0.5rem;
+        margin-bottom: 1rem;
+        border-left: 4px solid #dc3545;
+    }
+    
+    .icon-documents {
+        color: var(--color-soft-sky-blue);
+    }
+    
+    .icon-chat {
+        color: var(--color-olive-gray);
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto px-4 py-6">
+    <!-- Header -->
+    <div class="mb-8 text-center">
+        <h1 class="text-4xl font-bold mb-3" style="color: var(--color-deep-navy);">
+            Company Assistant
+        </h1>
+        <p class="text-lg" style="color: var(--color-olive-gray);">
+            Search across documents, files, SharePoint sites, and Teams conversations
+        </p>
+    </div>
+
+    <!-- Search Container -->
+    <div class="search-container">
+        <div class="search-input-wrapper">
+            <input 
+                type="text" 
+                id="searchInput" 
+                class="search-input" 
+                placeholder="Ask a question or search for keywords..."
+                autocomplete="off"
+            >
+            <button id="searchButton" class="search-button">
+                <span id="searchButtonText">Search</span>
+                <span id="searchButtonSpinner" class="spinner" style="display: none;"></span>
+            </button>
+        </div>
+
+        <!-- Error Display -->
+        <div id="errorDisplay" style="display: none;" class="error-message"></div>
+
+        <!-- Results Section -->
+        <div id="resultsSection" class="results-section">
+            <!-- Documents & Files Results -->
+            <div id="documentsSection" class="result-category" style="display: none;">
+                <div class="result-category-header">
+                    <div class="result-category-title">
+                        <svg class="w-6 h-6 icon-documents" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                        </svg>
+                        Documents & Files
+                    </div>
+                    <span id="documentsCount" class="result-count">0</span>
+                </div>
+                <div id="documentsResults"></div>
+            </div>
+
+            <!-- Teams Chat Results -->
+            <div id="teamsSection" class="result-category" style="display: none;">
+                <div class="result-category-header">
+                    <div class="result-category-title">
+                        <svg class="w-6 h-6 icon-chat" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path>
+                        </svg>
+                        Teams Conversations
+                    </div>
+                    <span id="teamsCount" class="result-count">0</span>
+                </div>
+                <div id="teamsResults"></div>
+            </div>
+
+            <!-- No Results -->
+            <div id="noResults" class="no-results" style="display: none;">
+                <svg class="w-16 h-16 mx-auto mb-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+                <p class="text-xl font-medium text-gray-600">No results found</p>
+                <p class="text-sm text-gray-500 mt-2">Try different keywords or rephrase your question</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const searchInput = document.getElementById('searchInput');
+    const searchButton = document.getElementById('searchButton');
+    const searchButtonText = document.getElementById('searchButtonText');
+    const searchButtonSpinner = document.getElementById('searchButtonSpinner');
+    const resultsSection = document.getElementById('resultsSection');
+    const errorDisplay = document.getElementById('errorDisplay');
+    const documentsSection = document.getElementById('documentsSection');
+    const teamsSection = document.getElementById('teamsSection');
+    const noResults = document.getElementById('noResults');
+    const documentsResults = document.getElementById('documentsResults');
+    const teamsResults = document.getElementById('teamsResults');
+    const documentsCount = document.getElementById('documentsCount');
+    const teamsCount = document.getElementById('teamsCount');
+
+    // Allow Enter key to trigger search
+    searchInput.addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+            performSearch();
+        }
+    });
+
+    searchButton.addEventListener('click', performSearch);
+
+    async function performSearch() {
+        const query = searchInput.value.trim();
+        
+        if (!query) {
+            return;
+        }
+
+        // Reset UI
+        errorDisplay.style.display = 'none';
+        resultsSection.classList.remove('visible');
+        documentsSection.style.display = 'none';
+        teamsSection.style.display = 'none';
+        noResults.style.display = 'none';
+
+        // Show loading state
+        searchButton.disabled = true;
+        searchButtonText.style.display = 'none';
+        searchButtonSpinner.style.display = 'inline-block';
+
+        try {
+            // Fetch both search results in parallel
+            const [globalResults, teamsResults] = await Promise.all([
+                fetch(`/graph/api/search/global/?q=${encodeURIComponent(query)}&size=25`)
+                    .then(r => r.json()),
+                fetch(`/graph/api/search/teams/?q=${encodeURIComponent(query)}&size=25`)
+                    .then(r => r.json())
+            ]);
+
+            // Process and display results
+            displayResults(globalResults, teamsResults);
+
+        } catch (error) {
+            console.error('Search error:', error);
+            showError('An error occurred while searching. Please try again.');
+        } finally {
+            // Reset button state
+            searchButton.disabled = false;
+            searchButtonText.style.display = 'inline';
+            searchButtonSpinner.style.display = 'none';
+        }
+    }
+
+    function displayResults(globalData, teamsData) {
+        resultsSection.classList.add('visible');
+
+        // Extract results from API response
+        const globalHits = extractHits(globalData);
+        const teamsHits = extractHits(teamsData);
+
+        // Display global search results (documents, sites, lists)
+        if (globalHits.length > 0) {
+            documentsSection.style.display = 'block';
+            documentsCount.textContent = globalHits.length;
+            documentsResults.innerHTML = globalHits.map(hit => renderDocumentResult(hit)).join('');
+        }
+
+        // Display Teams chat results
+        if (teamsHits.length > 0) {
+            teamsSection.style.display = 'block';
+            teamsCount.textContent = teamsHits.length;
+            teamsResults.innerHTML = teamsHits.map(hit => renderTeamsResult(hit)).join('');
+        }
+
+        // Show "no results" if both are empty
+        if (globalHits.length === 0 && teamsHits.length === 0) {
+            noResults.style.display = 'block';
+        }
+    }
+
+    function extractHits(data) {
+        // Navigate the Microsoft Search API response structure
+        if (!data || !data.value || !Array.isArray(data.value)) {
+            return [];
+        }
+
+        const hits = [];
+        for (const request of data.value) {
+            if (request.hitsContainers && Array.isArray(request.hitsContainers)) {
+                for (const container of request.hitsContainers) {
+                    if (container.hits && Array.isArray(container.hits)) {
+                        hits.push(...container.hits);
+                    }
+                }
+            }
+        }
+        return hits;
+    }
+
+    function renderDocumentResult(hit) {
+        const resource = hit.resource || {};
+        const title = resource.name || resource.title || resource.displayName || 'Untitled';
+        const webUrl = resource.webUrl || '#';
+        const summary = resource.summary || '';
+        const lastModified = resource.lastModifiedDateTime || resource.createdDateTime;
+        const modifiedBy = resource.lastModifiedBy?.user?.displayName || '';
+        
+        let metaParts = [];
+        if (lastModified) {
+            const date = new Date(lastModified);
+            metaParts.push(`Modified ${date.toLocaleDateString()}`);
+        }
+        if (modifiedBy) {
+            metaParts.push(`by ${modifiedBy}`);
+        }
+        
+        return `
+            <div class="result-item">
+                <div class="result-title">
+                    <a href="${escapeHtml(webUrl)}" target="_blank" rel="noopener noreferrer">
+                        ${escapeHtml(title)}
+                    </a>
+                </div>
+                ${metaParts.length > 0 ? `<div class="result-meta">${escapeHtml(metaParts.join(' '))}</div>` : ''}
+                ${summary ? `<div class="result-summary">${escapeHtml(summary)}</div>` : ''}
+            </div>
+        `;
+    }
+
+    function renderTeamsResult(hit) {
+        const resource = hit.resource || {};
+        const summary = hit.summary || '';
+        const from = resource.from?.user?.displayName || resource.from?.emailAddress?.name || 'Unknown';
+        const subject = resource.subject || '';
+        const createdDateTime = resource.createdDateTime;
+        const webUrl = resource.webLink || resource.webUrl || '#';
+        
+        let title = subject || 'Chat Message';
+        if (from) {
+            title = `${from}: ${subject || 'Message'}`;
+        }
+        
+        let metaParts = [];
+        if (createdDateTime) {
+            const date = new Date(createdDateTime);
+            metaParts.push(date.toLocaleString());
+        }
+        
+        return `
+            <div class="result-item">
+                <div class="result-title">
+                    <a href="${escapeHtml(webUrl)}" target="_blank" rel="noopener noreferrer">
+                        ${escapeHtml(title)}
+                    </a>
+                </div>
+                ${metaParts.length > 0 ? `<div class="result-meta">${escapeHtml(metaParts.join(' '))}</div>` : ''}
+                ${summary ? `<div class="result-summary">${escapeHtml(summary)}</div>` : ''}
+            </div>
+        `;
+    }
+
+    function showError(message) {
+        errorDisplay.textContent = message;
+        errorDisplay.style.display = 'block';
+    }
+
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+});
+</script>
+{% endblock %}

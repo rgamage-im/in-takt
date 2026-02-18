@@ -10,7 +10,8 @@ from .auth_views import (
     GraphExploreView,
     TeamsMessagesTableView,
     ExpenseReceiptsTableView,
-    TeamsWebhooksView
+    TeamsWebhooksView,
+    CompanyAssistantView
 )
 from .api_views import (
     MyProfileAPIView,
@@ -61,6 +62,9 @@ urlpatterns = [
     
     # Teams Webhooks Management (HTML)
     path('webhooks/teams/', TeamsWebhooksView.as_view(), name='teams-webhooks'),
+    
+    # Company Assistant (HTML)
+    path('assistant/', CompanyAssistantView.as_view(), name='company-assistant'),
 
     # API Routes - Delegated Permissions (uses session token)
     path('api/me/', MyProfileAPIView.as_view(), name='api-my-profile'),

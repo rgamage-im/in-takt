@@ -215,3 +215,26 @@ class TeamsWebhooksView(View):
         Show Teams webhooks management page
         """
         return render(request, 'msgraph/teams_webhooks.html')
+
+
+@method_decorator(login_required, name='dispatch')
+class CompanyAssistantView(View):
+    """
+    Display Company Assistant page with search functionality
+    Requires Django authentication + MS Graph OAuth
+    """
+
+    def get(self, request):
+        """
+        Show Company Assistant page with search interface
+        """
+        # Check if user is authenticated with Microsoft Graph
+        access_token = request.session.get('graph_access_token')
+
+        if not access_token:
+            # Store intended destination and redirect to login
+            request.session['graph_next'] = 'msgraph:company-assistant'
+            return redirect('msgraph:graph-login')
+
+        # Render the template - searches will be performed via AJAX
+        return render(request, 'msgraph/company_assistant.html')

@@ -8,6 +8,11 @@ from msal import ConfidentialClientApplication
 import requests
 
 
+class GraphTokenExpiredError(Exception):
+    """Raised when the Microsoft Graph access token has expired or been revoked."""
+    pass
+
+
 class GraphServiceDelegated:
     """
     Service class for Microsoft Graph API with delegated permissions
@@ -128,6 +133,10 @@ class GraphServiceDelegated:
         url = f"{self.graph_endpoint}{endpoint}"
         
         response = requests.request(method, url, headers=headers, json=data)
+        if response.status_code == 401:
+            raise GraphTokenExpiredError(
+                "Microsoft Graph token has expired or been revoked. Please sign in again."
+            )
         response.raise_for_status()
         
         return response.json()

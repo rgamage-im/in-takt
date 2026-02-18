@@ -435,6 +435,18 @@
         <!-- Error Display -->
         <div id="errorDisplay" style="display: none;" class="error-message"></div>
 
+        <!-- Re-auth Banner (shown when MS Graph session expires mid-session) -->
+        <div id="reAuthBanner" style="display:none; background:#fff3cd; color:#856404;
+             padding:1rem; border-radius:0.5rem; margin-bottom:1rem;
+             border-left:4px solid #ffc107;">
+            <strong>Your Microsoft session has expired.</strong>
+            <a id="reAuthLink" href="/graph/login/"
+               style="margin-left:0.75rem; font-weight:600;
+                      color:var(--color-warm-brick); text-decoration:underline;">
+                Sign in again &rarr;
+            </a>
+        </div>
+
         <!-- ======= CHAT MODE PANEL ======= -->
         <div id="chatPanel">
             <div id="chatHistory" class="chat-history"></div>
@@ -522,6 +534,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const searchButtonText  = document.getElementById('searchButtonText');
     const searchButtonSpinner = document.getElementById('searchButtonSpinner');
     const errorDisplay      = document.getElementById('errorDisplay');
+    const reAuthBanner      = document.getElementById('reAuthBanner');
 
     // Chat
     const chatPanel         = document.getElementById('chatPanel');
@@ -590,12 +603,22 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     function showError(msg) {
+        reAuthBanner.style.display = 'none';
         errorDisplay.textContent = msg;
         errorDisplay.style.display = 'block';
     }
 
     function clearError() {
         errorDisplay.style.display = 'none';
+        reAuthBanner.style.display = 'none';
+    }
+
+    function showAuthRequired(loginUrl) {
+        errorDisplay.style.display = 'none';
+        const link = document.getElementById('reAuthLink');
+        const next = encodeURIComponent('/graph/assistant/');
+        link.href = (loginUrl || '/graph/login/') + '?next=' + next;
+        reAuthBanner.style.display = 'block';
     }
 
     // -------------------------------------------------------
@@ -627,10 +650,28 @@ document.addEventListener('DOMContentLoaded', function () {
                 }),
             });
 
-            const data = await response.json();
+            // Safely parse JSON — a non-JSON response (e.g. login redirect page)
+            // means the session expired; surface a clear message instead of a
+            // cryptic "Unexpected token '<'" error.
+            let data;
+            const contentType = response.headers.get('content-type') || '';
+            if (contentType.includes('application/json')) {
+                data = await response.json();
+            } else {
+                const text = await response.text();
+                if (response.status === 401 || response.status === 302 || text.includes('login')) {
+                    throw new Error('Session expired — please refresh the page and log in again.');
+                }
+                throw new Error(`Server returned non-JSON response (HTTP ${response.status})`);
+            }
+
+            if (data.auth_required) {
+                showAuthRequired(data.login_url);
+                return;
+            }
 
             if (!response.ok) {
-                throw new Error(data.error || 'Server error');
+                throw new Error(data.error || `Server error (HTTP ${response.status})`);
             }
 
             // Append turn to conversation history for follow-ups
@@ -719,23 +760,27 @@ document.addEventListener('DOMContentLoaded', function () {
         try {
             const searchPromises = [];
 
+            const authCheck = async (url, type) => {
+                const r = await fetch(url);
+                const data = await r.json();
+                if (data.auth_required) throw { authRequired: true, loginUrl: data.login_url };
+                return { type, data };
+            };
+
             if (sources.includes('sharepoint')) {
-                searchPromises.push(
-                    fetch(`/graph/api/search/global/?q=${encodeURIComponent(query)}&size=10`)
-                        .then(r => r.json()).then(data => ({ type: 'sharepoint', data }))
-                );
+                searchPromises.push(authCheck(
+                    `/graph/api/search/global/?q=${encodeURIComponent(query)}&size=10`, 'sharepoint'
+                ));
             }
             if (sources.includes('teams')) {
-                searchPromises.push(
-                    fetch(`/graph/api/search/teams/?q=${encodeURIComponent(query)}&size=10`)
-                        .then(r => r.json()).then(data => ({ type: 'teams', data }))
-                );
+                searchPromises.push(authCheck(
+                    `/graph/api/search/teams/?q=${encodeURIComponent(query)}&size=10`, 'teams'
+                ));
             }
             if (sources.includes('email')) {
-                searchPromises.push(
-                    fetch(`/graph/api/search/email/?q=${encodeURIComponent(query)}&size=10`)
-                        .then(r => r.json()).then(data => ({ type: 'email', data }))
-                );
+                searchPromises.push(authCheck(
+                    `/graph/api/search/email/?q=${encodeURIComponent(query)}&size=10`, 'email'
+                ));
             }
 
             const results = await Promise.all(searchPromises);
@@ -744,7 +789,11 @@ document.addEventListener('DOMContentLoaded', function () {
             displaySearchResults(byType);
 
         } catch (err) {
-            showError('An error occurred while searching. Please try again.');
+            if (err && err.authRequired) {
+                showAuthRequired(err.loginUrl);
+            } else {
+                showError('An error occurred while searching. Please try again.');
+            }
         } finally {
             setLoading(false);
         }

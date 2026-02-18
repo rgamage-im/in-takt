@@ -7,14 +7,15 @@ from typing import List, Dict, Any
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, AllowAny
+from rest_framework.renderers import JSONRenderer
 from drf_spectacular.utils import extend_schema, OpenApiParameter
 from drf_spectacular.types import OpenApiTypes
 from django.http import HttpResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.utils.decorators import method_decorator
 
-from .services_delegated import GraphServiceDelegated
+from .services_delegated import GraphServiceDelegated, GraphTokenExpiredError
 from .serializers import UserProfileSerializer
 
 
@@ -973,6 +974,16 @@ class GlobalSearchAPIView(APIView):
             
             return Response(results, status=status.HTTP_200_OK)
             
+        except GraphTokenExpiredError:
+            request.session.pop('graph_access_token', None)
+            return Response(
+                {
+                    'auth_required': True,
+                    'error': 'Your Microsoft session has expired. Please sign in again.',
+                    'login_url': '/graph/login/',
+                },
+                status=status.HTTP_401_UNAUTHORIZED
+            )
         except ValueError as e:
             return Response(
                 {'error': f'Invalid parameter value: {str(e)}'},
@@ -1083,6 +1094,16 @@ class TeamsSearchAPIView(APIView):
             
             return Response(results, status=status.HTTP_200_OK)
             
+        except GraphTokenExpiredError:
+            request.session.pop('graph_access_token', None)
+            return Response(
+                {
+                    'auth_required': True,
+                    'error': 'Your Microsoft session has expired. Please sign in again.',
+                    'login_url': '/graph/login/',
+                },
+                status=status.HTTP_401_UNAUTHORIZED
+            )
         except ValueError as e:
             return Response(
                 {'error': f'Invalid parameter value: {str(e)}'},
@@ -1194,6 +1215,16 @@ class EmailSearchAPIView(APIView):
             
             return Response(results, status=status.HTTP_200_OK)
             
+        except GraphTokenExpiredError:
+            request.session.pop('graph_access_token', None)
+            return Response(
+                {
+                    'auth_required': True,
+                    'error': 'Your Microsoft session has expired. Please sign in again.',
+                    'login_url': '/graph/login/',
+                },
+                status=status.HTTP_401_UNAUTHORIZED
+            )
         except ValueError as e:
             return Response(
                 {'error': f'Invalid parameter value: {str(e)}'},
@@ -1209,9 +1240,14 @@ class EmailSearchAPIView(APIView):
 class AssistantChatAPIView(APIView):
     """
     Company Assistant chat endpoint — searches M365 data and synthesizes
-    a natural language answer with citations using GitHub Models (GPT-4o).
+    a natural language answer with citations using the configured LLM.
     """
-    permission_classes = [IsAuthenticated]
+    # AllowAny: the view enforces its own auth by checking graph_access_token
+    # in the session, returning a JSON 401 if absent. Using IsAuthenticated here
+    # causes DRF to return an HTML 403 in production when the Django user is not
+    # set (Graph OAuth stores only a session token, not a Django user object).
+    permission_classes = [AllowAny]
+    renderer_classes = [JSONRenderer]  # always return JSON, never HTML
 
     @extend_schema(
         summary="Company Assistant Chat",
@@ -1316,6 +1352,16 @@ class AssistantChatAPIView(APIView):
 
             return Response(result, status=status.HTTP_200_OK)
 
+        except GraphTokenExpiredError:
+            request.session.pop('graph_access_token', None)
+            return Response(
+                {
+                    'auth_required': True,
+                    'error': 'Your Microsoft session has expired. Please sign in again.',
+                    'login_url': '/graph/login/',
+                },
+                status=status.HTTP_401_UNAUTHORIZED
+            )
         except ValueError as e:
             return Response(
                 {'error': str(e)},

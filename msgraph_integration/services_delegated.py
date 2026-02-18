@@ -27,6 +27,8 @@ class GraphServiceDelegated:
             "User.ReadBasic.All",
             "Calendars.Read",
             "Mail.Read",
+            "Chat.Read",  # Required for searching Teams chats
+            "Chat.ReadBasic",  # Basic access to Teams chats
             "ChannelMessage.Read.All",
             "Team.ReadBasic.All",
             "Files.Read",

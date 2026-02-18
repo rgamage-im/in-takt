@@ -942,7 +942,7 @@ class GlobalSearchAPIView(APIView):
             entity_types = [et.strip() for et in entity_types_str.split(',') if et.strip()]
             
             # Validate entity types
-            valid_types = {'driveItem', 'listItem', 'site', 'list', 'message', 'event', 'person'}
+            valid_types = {'driveItem', 'listItem', 'site', 'list', 'message', 'event', 'person', 'chatMessage'}
             invalid_types = set(entity_types) - valid_types
             if invalid_types:
                 return Response(
@@ -967,6 +967,116 @@ class GlobalSearchAPIView(APIView):
                 access_token, 
                 query, 
                 entity_types=entity_types,
+                from_index=from_index,
+                size=size
+            )
+            
+            return Response(results, status=status.HTTP_200_OK)
+            
+        except ValueError as e:
+            return Response(
+                {'error': f'Invalid parameter value: {str(e)}'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        except Exception as e:
+            return Response(
+                {'error': str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+
+class TeamsSearchAPIView(APIView):
+    """
+    Search Microsoft Teams chat messages
+    """
+    permission_classes = [IsAuthenticated]
+    
+    @extend_schema(
+        summary="Search Teams Chat Messages",
+        description="""
+        Search for messages in Microsoft Teams chats and channels.
+        
+        This endpoint searches specifically for Teams chat content including:
+        - Direct messages (1:1 chats)
+        - Group chats
+        - Channel messages
+        - Replies and threads
+        
+        The search uses Microsoft's unified search engine to find relevant messages
+        based on content, sender, and other message properties.
+        
+        Query parameters:
+        - `q`: Search query string (required, e.g., "budget discussion")
+        - `from`: Starting index for pagination (optional, default: 0)
+        - `size`: Number of results to return (optional, default: 25, max: 1000)
+        
+        Example: `/api/search/teams/?q=project%20update&size=50`
+        
+        Note: This requires the appropriate Teams permissions to be granted during authentication.
+        """,
+        parameters=[
+            OpenApiParameter(
+                name='q',
+                type=OpenApiTypes.STR,
+                location=OpenApiParameter.QUERY,
+                description='Search query string (e.g., "budget discussion")',
+                required=True,
+            ),
+            OpenApiParameter(
+                name='from',
+                type=OpenApiTypes.INT,
+                location=OpenApiParameter.QUERY,
+                description='Starting index for pagination (default: 0)',
+                required=False,
+            ),
+            OpenApiParameter(
+                name='size',
+                type=OpenApiTypes.INT,
+                location=OpenApiParameter.QUERY,
+                description='Number of results to return (default: 25, max: 1000)',
+                required=False,
+            ),
+        ],
+        responses={200: dict},
+        tags=['Microsoft Graph - Search']
+    )
+    def get(self, request):
+        """
+        Search Teams chat messages
+        """
+        access_token = request.session.get('graph_access_token')
+        
+        if not access_token:
+            return Response(
+                {'error': 'Not authenticated with Microsoft', 'login_url': '/graph/login/'},
+                status=status.HTTP_401_UNAUTHORIZED
+            )
+        
+        query = request.query_params.get('q')
+        if not query:
+            return Response(
+                {'error': 'Missing required parameter: q (search query)'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            # Parse pagination parameters
+            from_index = int(request.query_params.get('from', 0))
+            size = int(request.query_params.get('size', 25))
+            
+            # Validate size
+            if size < 1 or size > 1000:
+                return Response(
+                    {'error': 'size must be between 1 and 1000'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Execute search with chatMessage entity type
+            graph_service = GraphServiceDelegated()
+            results = graph_service.global_search(
+                access_token, 
+                query, 
+                entity_types=["chatMessage"],
                 from_index=from_index,
                 size=size
             )

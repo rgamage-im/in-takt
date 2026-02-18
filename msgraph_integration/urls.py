@@ -27,6 +27,7 @@ from .api_views import (
     AllAccessibleDrivesAPIView,
     SearchAllDrivesIncludingSharePointAPIView,
     GlobalSearchAPIView,
+    TeamsSearchAPIView,
     ExpenseReceiptsAPIView,
     DownloadFileAPIView,
     UploadReceiptToQuickBooksAPIView,
@@ -83,6 +84,7 @@ urlpatterns = [
     
     # Global Search API
     path('api/search/global/', GlobalSearchAPIView.as_view(), name='api-global-search'),
+    path('api/search/teams/', TeamsSearchAPIView.as_view(), name='api-teams-search'),
     
     # Expense Receipts API
     path('api/receipts/expense/', ExpenseReceiptsAPIView.as_view(), name='api-expense-receipts'),

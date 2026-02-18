@@ -1206,12 +1206,134 @@ class EmailSearchAPIView(APIView):
             )
 
 
+class AssistantChatAPIView(APIView):
+    """
+    Company Assistant chat endpoint — searches M365 data and synthesizes
+    a natural language answer with citations using GitHub Models (GPT-4o).
+    """
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(
+        summary="Company Assistant Chat",
+        description="""
+        Accepts a natural language question and selected search sources, queries
+        Microsoft 365 data (SharePoint, Teams, Email) in parallel, then uses
+        GPT-4o (via GitHub Models) to synthesize a grounded answer with citations.
+
+        Request body:
+        ```json
+        {
+          "question": "What was decided about the Phoenix project budget?",
+          "sources": ["sharepoint", "teams", "email"],
+          "conversation_history": []
+        }
+        ```
+
+        Response:
+        ```json
+        {
+          "answer": "According to [1] and [3], the Phoenix project budget was...",
+          "sources": [
+            {"index": 1, "title": "Phoenix Budget.xlsx", "url": "...", "type": "sharepoint", "date": "2026-01-15"},
+            ...
+          ]
+        }
+        ```
+        """,
+        request=dict,
+        responses={200: dict},
+        tags=['Microsoft Graph - Search']
+    )
+    def post(self, request):
+        """
+        Run the full assistant pipeline: search → synthesize → respond.
+        """
+        from .ai_service import CompanyAssistantService
+
+        access_token = request.session.get('graph_access_token')
+        if not access_token:
+            return Response(
+                {'error': 'Not authenticated with Microsoft', 'login_url': '/graph/login/'},
+                status=status.HTTP_401_UNAUTHORIZED
+            )
+
+        question = request.data.get('question', '').strip()
+        if not question:
+            return Response(
+                {'error': 'Missing required field: question'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        sources = request.data.get('sources', ['sharepoint', 'teams', 'email'])
+        conversation_history = request.data.get('conversation_history', [])
+
+        try:
+            # Stage 1: Extract search keywords via LLM
+            assistant = CompanyAssistantService()
+            keywords = assistant.extract_search_keywords(question)
+
+            # Stage 2: Search selected sources in parallel using threads
+            import concurrent.futures
+
+            graph_service = GraphServiceDelegated()
+            search_results = {}
+
+            def search_sharepoint():
+                return graph_service.global_search(access_token, keywords, size=10)
+
+            def search_teams():
+                return graph_service.global_search(access_token, keywords, entity_types=["chatMessage"], size=10)
+
+            def search_email():
+                return graph_service.global_search(access_token, keywords, entity_types=["message"], size=10)
+
+            with concurrent.futures.ThreadPoolExecutor() as executor:
+                futures = {}
+                if 'sharepoint' in sources:
+                    futures['sharepoint'] = executor.submit(search_sharepoint)
+                if 'teams' in sources:
+                    futures['teams'] = executor.submit(search_teams)
+                if 'email' in sources:
+                    futures['email'] = executor.submit(search_email)
+
+                for source_name, future in futures.items():
+                    try:
+                        search_results[source_name] = future.result(timeout=15)
+                    except Exception:
+                        search_results[source_name] = None
+
+            # Stage 3: Synthesize answer with citations
+            result = assistant.chat(
+                question=question,
+                sharepoint_data=search_results.get('sharepoint'),
+                teams_data=search_results.get('teams'),
+                email_data=search_results.get('email'),
+                conversation_history=conversation_history,
+            )
+
+            # Include keywords in response for transparency/debugging
+            result['keywords'] = keywords
+
+            return Response(result, status=status.HTTP_200_OK)
+
+        except ValueError as e:
+            return Response(
+                {'error': str(e)},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        except Exception as e:
+            return Response(
+                {'error': str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+
 class ExpenseReceiptsAPIView(APIView):
     """
     Get expense receipts from SharePoint folder
     """
     permission_classes = [IsAuthenticated]
-    
+
     @extend_schema(
         summary="List Expense Receipts",
         description="""

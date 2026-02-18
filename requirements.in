@@ -15,6 +15,9 @@ django-cors-headers
 msal
 msgraph-sdk
 
+# AI / LLM
+openai  # Used as OpenAI-compatible SDK for Groq API (llama-4-scout)
+
 # QuickBooks Integration
 intuit-oauth
 python-quickbooks

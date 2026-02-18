@@ -9,33 +9,65 @@
         max-width: 800px;
         margin: 0 auto;
     }
-    
+
+    /* Mode toggle */
+    .mode-toggle {
+        display: flex;
+        gap: 0;
+        border: 2px solid var(--color-soft-sky-blue);
+        border-radius: 0.5rem;
+        overflow: hidden;
+        margin-bottom: 1.25rem;
+        width: fit-content;
+    }
+
+    .mode-btn {
+        padding: 0.5rem 1.25rem;
+        font-size: 0.9rem;
+        font-weight: 600;
+        cursor: pointer;
+        border: none;
+        background: white;
+        color: var(--color-deep-navy);
+        transition: all 0.2s;
+    }
+
+    .mode-btn.active {
+        background: var(--color-soft-sky-blue);
+        color: white;
+    }
+
+    .mode-btn:hover:not(.active) {
+        background: #f0f7fc;
+    }
+
+    /* Shared input area */
     .search-input-wrapper {
         position: relative;
         margin-bottom: 1rem;
     }
-    
+
     .search-sources {
         display: flex;
         gap: 1.5rem;
-        margin-bottom: 2rem;
+        margin-bottom: 1.25rem;
         align-items: center;
     }
-    
+
     .source-checkbox {
         display: flex;
         align-items: center;
         gap: 0.5rem;
         cursor: pointer;
     }
-    
+
     .source-checkbox input[type="checkbox"] {
         width: 1.25rem;
         height: 1.25rem;
         cursor: pointer;
         accent-color: var(--color-warm-brick);
     }
-    
+
     .source-checkbox label {
         cursor: pointer;
         font-size: 0.95rem;
@@ -43,7 +75,7 @@
         font-weight: 500;
         user-select: none;
     }
-    
+
     .search-input {
         width: 100%;
         padding: 1rem 3rem 1rem 1rem;
@@ -52,13 +84,13 @@
         border-radius: 0.5rem;
         transition: all 0.3s ease;
     }
-    
+
     .search-input:focus {
         outline: none;
         border-color: var(--color-warm-brick);
         box-shadow: 0 0 0 3px rgba(193, 78, 50, 0.1);
     }
-    
+
     .search-button {
         position: absolute;
         right: 0.5rem;
@@ -72,16 +104,16 @@
         cursor: pointer;
         transition: background-color 0.2s;
     }
-    
+
     .search-button:hover:not(:disabled) {
         background-color: #a94e35;
     }
-    
+
     .search-button:disabled {
         opacity: 0.6;
         cursor: not-allowed;
     }
-    
+
     .spinner {
         border: 2px solid var(--color-light-sand);
         border-top: 2px solid var(--color-warm-brick);
@@ -91,21 +123,160 @@
         animation: spin 1s linear infinite;
         display: inline-block;
     }
-    
+
     @keyframes spin {
         0% { transform: rotate(0deg); }
         100% { transform: rotate(360deg); }
     }
-    
+
+    /* --- Chat mode UI --- */
+    .chat-history {
+        margin-bottom: 1.25rem;
+    }
+
+    .chat-turn {
+        margin-bottom: 1.25rem;
+    }
+
+    .chat-question {
+        background: var(--color-deep-navy);
+        color: white;
+        padding: 0.75rem 1rem;
+        border-radius: 0.5rem 0.5rem 0 0.5rem;
+        font-size: 0.95rem;
+        margin-bottom: 0.5rem;
+        max-width: 85%;
+        margin-left: auto;
+        text-align: right;
+    }
+
+    .chat-answer {
+        background: white;
+        border: 1px solid #dee2e6;
+        border-radius: 0.5rem 0.5rem 0.5rem 0;
+        padding: 1rem;
+        font-size: 0.95rem;
+        line-height: 1.6;
+    }
+
+    .chat-answer-text {
+        margin-bottom: 0.75rem;
+        white-space: pre-wrap;
+    }
+
+    .chat-keywords {
+        font-size: 0.75rem;
+        color: #9ca3af;
+        margin-bottom: 0.5rem;
+    }
+
+    .chat-sources {
+        border-top: 1px solid #e5e7eb;
+        padding-top: 0.6rem;
+        margin-top: 0.6rem;
+    }
+
+    .chat-sources-title {
+        font-size: 0.8rem;
+        font-weight: 600;
+        color: #6b7280;
+        margin-bottom: 0.4rem;
+    }
+
+    .chat-source-item {
+        display: flex;
+        align-items: baseline;
+        gap: 0.4rem;
+        margin-bottom: 0.3rem;
+        font-size: 0.8rem;
+        color: #374151;
+    }
+
+    .chat-source-idx {
+        flex-shrink: 0;
+        font-weight: 700;
+        color: var(--color-warm-brick);
+        min-width: 1.5rem;
+    }
+
+    .chat-source-type {
+        flex-shrink: 0;
+        font-size: 0.7rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        padding: 0.1rem 0.4rem;
+        border-radius: 0.25rem;
+        background: #e5e7eb;
+        color: #6b7280;
+    }
+
+    .chat-source-link {
+        color: var(--color-deep-navy);
+        text-decoration: none;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .chat-source-link:hover {
+        color: var(--color-warm-brick);
+        text-decoration: underline;
+    }
+
+    .thinking-indicator {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        padding: 0.75rem 1rem;
+        background: white;
+        border: 1px solid #dee2e6;
+        border-radius: 0.5rem;
+        font-size: 0.9rem;
+        color: #6b7280;
+        margin-bottom: 1rem;
+    }
+
+    .thinking-dots span {
+        display: inline-block;
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: var(--color-warm-brick);
+        animation: bounce 1.2s infinite;
+        margin-right: 3px;
+    }
+
+    .thinking-dots span:nth-child(2) { animation-delay: 0.2s; }
+    .thinking-dots span:nth-child(3) { animation-delay: 0.4s; }
+
+    @keyframes bounce {
+        0%, 80%, 100% { transform: scale(0.6); opacity: 0.5; }
+        40% { transform: scale(1); opacity: 1; }
+    }
+
+    .chat-clear-btn {
+        font-size: 0.8rem;
+        color: #9ca3af;
+        background: none;
+        border: none;
+        cursor: pointer;
+        padding: 0;
+        margin-bottom: 0.75rem;
+        text-decoration: underline;
+    }
+
+    .chat-clear-btn:hover { color: var(--color-warm-brick); }
+
+    /* --- Search mode (raw results) --- */
     .results-section {
         display: none;
         margin-top: 1.5rem;
     }
-    
+
     .results-section.visible {
         display: block;
     }
-    
+
     .result-category {
         background: white;
         border-radius: 0.5rem;
@@ -113,7 +284,7 @@
         margin-bottom: 1rem;
         box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
     }
-    
+
     .result-category-header {
         display: flex;
         align-items: center;
@@ -122,7 +293,7 @@
         padding-bottom: 0.5rem;
         border-bottom: 2px solid var(--color-light-sand);
     }
-    
+
     .result-category-title {
         font-size: 1.1rem;
         font-weight: 600;
@@ -131,7 +302,7 @@
         align-items: center;
         gap: 0.5rem;
     }
-    
+
     .result-count {
         background-color: var(--color-warm-brick);
         color: white;
@@ -140,56 +311,56 @@
         font-size: 0.8rem;
         font-weight: 600;
     }
-    
+
     .result-item {
-        padding: 0.3rem;
+        padding: 0.75rem;
         border-left: 3px solid var(--color-soft-sky-blue);
         background-color: #f8f9fa;
         margin-bottom: 0.5rem;
         border-radius: 0.25rem;
         transition: all 0.2s;
     }
-    
+
     .result-item:hover {
         background-color: #e9ecef;
         border-left-color: var(--color-warm-brick);
     }
-    
+
     .result-title {
         font-weight: 600;
         color: var(--color-deep-navy);
         margin-bottom: 0.35rem;
         font-size: 0.95rem;
     }
-    
+
     .result-title a {
         color: var(--color-deep-navy);
         text-decoration: none;
     }
-    
+
     .result-title a:hover {
         color: var(--color-warm-brick);
         text-decoration: underline;
     }
-    
+
     .result-meta {
         font-size: 0.8rem;
         color: #6c757d;
         margin-bottom: 0.35rem;
     }
-    
+
     .result-summary {
         font-size: 0.85rem;
         color: #495057;
         line-height: 1.4;
     }
-    
+
     .no-results {
         text-align: center;
         padding: 2rem;
         color: #6c757d;
     }
-    
+
     .error-message {
         background-color: #f8d7da;
         color: #721c24;
@@ -198,25 +369,17 @@
         margin-bottom: 1rem;
         border-left: 4px solid #dc3545;
     }
-    
-    .icon-documents {
-        color: var(--color-soft-sky-blue);
-    }
-    
-    .icon-chat {
-        color: var(--color-olive-gray);
-    }
-    
-    .icon-email {
-        color: var(--color-warm-brick);
-    }
+
+    .icon-documents { color: var(--color-soft-sky-blue); }
+    .icon-chat { color: var(--color-olive-gray); }
+    .icon-email { color: var(--color-warm-brick); }
 </style>
 {% endblock %}
 
 {% block content %}
 <div class="max-w-7xl mx-auto px-4 py-6">
     <!-- Header -->
-    <div class="mb-8 text-center">
+    <div class="mb-6 text-center">
         <h1 class="text-4xl font-bold mb-3" style="color: var(--color-deep-navy);">
             Company Assistant
         </h1>
@@ -227,21 +390,33 @@
 
     <!-- Search Container -->
     <div class="search-container">
+
+        <!-- Mode Toggle -->
+        <div class="mode-toggle">
+            <button class="mode-btn active" id="btnChat" onclick="setMode('chat')">
+                ✦ Ask a Question
+            </button>
+            <button class="mode-btn" id="btnSearch" onclick="setMode('search')">
+                ⊞ Raw Search
+            </button>
+        </div>
+
+        <!-- Input field (shared) -->
         <div class="search-input-wrapper">
-            <input 
-                type="text" 
-                id="searchInput" 
-                class="search-input" 
+            <input
+                type="text"
+                id="searchInput"
+                class="search-input"
                 placeholder="Ask a question or search for keywords..."
                 autocomplete="off"
             >
             <button id="searchButton" class="search-button">
-                <span id="searchButtonText">Search</span>
+                <span id="searchButtonText">Ask</span>
                 <span id="searchButtonSpinner" class="spinner" style="display: none;"></span>
             </button>
         </div>
 
-        <!-- Search Source Checkboxes -->
+        <!-- Source Checkboxes -->
         <div class="search-sources">
             <div class="source-checkbox">
                 <input type="checkbox" id="sourceSharePoint" checked>
@@ -260,333 +435,411 @@
         <!-- Error Display -->
         <div id="errorDisplay" style="display: none;" class="error-message"></div>
 
-        <!-- Results Section -->
-        <div id="resultsSection" class="results-section">
-            <!-- Documents & Files Results -->
-            <div id="documentsSection" class="result-category" style="display: none;">
-                <div class="result-category-header">
-                    <div class="result-category-title">
-                        <svg class="w-6 h-6 icon-documents" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-                        </svg>
-                        Documents & Files
-                    </div>
-                    <span id="documentsCount" class="result-count">0</span>
+        <!-- ======= CHAT MODE PANEL ======= -->
+        <div id="chatPanel">
+            <div id="chatHistory" class="chat-history"></div>
+            <div id="thinkingIndicator" class="thinking-indicator" style="display:none;">
+                <div class="thinking-dots">
+                    <span></span><span></span><span></span>
                 </div>
-                <div id="documentsResults"></div>
-            </div>
-
-            <!-- Teams Chat Results -->
-            <div id="teamsSection" class="result-category" style="display: none;">
-                <div class="result-category-header">
-                    <div class="result-category-title">
-                        <svg class="w-6 h-6 icon-chat" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path>
-                        </svg>
-                        Teams Conversations
-                    </div>
-                    <span id="teamsCount" class="result-count">0</span>
-                </div>
-                <div id="teamsResults"></div>
-            </div>
-
-            <!-- Email Results -->
-            <div id="emailSection" class="result-category" style="display: none;">
-                <div class="result-category-header">
-                    <div class="result-category-title">
-                        <svg class="w-6 h-6 icon-email" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path>
-                        </svg>
-                        Email Messages
-                    </div>
-                    <span id="emailCount" class="result-count">0</span>
-                </div>
-                <div id="emailResults"></div>
-            </div>
-
-            <!-- No Results -->
-            <div id="noResults" class="no-results" style="display: none;">
-                <svg class="w-16 h-16 mx-auto mb-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                </svg>
-                <p class="text-xl font-medium text-gray-600">No results found</p>
-                <p class="text-sm text-gray-500 mt-2">Try different keywords or rephrase your question</p>
+                Searching and synthesizing answer...
             </div>
         </div>
+
+        <!-- ======= SEARCH MODE PANEL ======= -->
+        <div id="searchPanel" style="display:none;">
+            <div id="resultsSection" class="results-section">
+                <!-- Documents & Files Results -->
+                <div id="documentsSection" class="result-category" style="display: none;">
+                    <div class="result-category-header">
+                        <div class="result-category-title">
+                            <svg class="w-6 h-6 icon-documents" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                            </svg>
+                            Documents & Files
+                        </div>
+                        <span id="documentsCount" class="result-count">0</span>
+                    </div>
+                    <div id="documentsResults"></div>
+                </div>
+
+                <!-- Teams Chat Results -->
+                <div id="teamsSection" class="result-category" style="display: none;">
+                    <div class="result-category-header">
+                        <div class="result-category-title">
+                            <svg class="w-6 h-6 icon-chat" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path>
+                            </svg>
+                            Teams Conversations
+                        </div>
+                        <span id="teamsCount" class="result-count">0</span>
+                    </div>
+                    <div id="teamsResults"></div>
+                </div>
+
+                <!-- Email Results -->
+                <div id="emailSection" class="result-category" style="display: none;">
+                    <div class="result-category-header">
+                        <div class="result-category-title">
+                            <svg class="w-6 h-6 icon-email" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path>
+                            </svg>
+                            Email Messages
+                        </div>
+                        <span id="emailCount" class="result-count">0</span>
+                    </div>
+                    <div id="emailResults"></div>
+                </div>
+
+                <!-- No Results -->
+                <div id="noResults" class="no-results" style="display: none;">
+                    <svg class="w-16 h-16 mx-auto mb-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                    <p class="text-xl font-medium text-gray-600">No results found</p>
+                    <p class="text-sm text-gray-500 mt-2">Try different keywords or rephrase your question</p>
+                </div>
+            </div>
+        </div>
+
     </div>
 </div>
+
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-    const searchInput = document.getElementById('searchInput');
-    const searchButton = document.getElementById('searchButton');
-    const searchButtonText = document.getElementById('searchButtonText');
+document.addEventListener('DOMContentLoaded', function () {
+
+    // -------------------------------------------------------
+    // State
+    // -------------------------------------------------------
+    let currentMode = 'chat';  // 'chat' | 'search'
+    let conversationHistory = [];  // [{role, content}, ...] for multi-turn
+
+    // -------------------------------------------------------
+    // DOM refs
+    // -------------------------------------------------------
+    const searchInput       = document.getElementById('searchInput');
+    const searchButton      = document.getElementById('searchButton');
+    const searchButtonText  = document.getElementById('searchButtonText');
     const searchButtonSpinner = document.getElementById('searchButtonSpinner');
-    const resultsSection = document.getElementById('resultsSection');
-    const errorDisplay = document.getElementById('errorDisplay');
-    const documentsSection = document.getElementById('documentsSection');
-    const teamsSection = document.getElementById('teamsSection');
-    const emailSection = document.getElementById('emailSection');
-    const noResults = document.getElementById('noResults');
-    const documentsResults = document.getElementById('documentsResults');
-    const teamsResults = document.getElementById('teamsResults');
-    const emailResults = document.getElementById('emailResults');
-    const documentsCount = document.getElementById('documentsCount');
-    const teamsCount = document.getElementById('teamsCount');
-    const emailCount = document.getElementById('emailCount');
-    
+    const errorDisplay      = document.getElementById('errorDisplay');
+
+    // Chat
+    const chatPanel         = document.getElementById('chatPanel');
+    const chatHistory       = document.getElementById('chatHistory');
+    const thinkingIndicator = document.getElementById('thinkingIndicator');
+
+    // Search
+    const searchPanel       = document.getElementById('searchPanel');
+    const resultsSection    = document.getElementById('resultsSection');
+    const documentsSection  = document.getElementById('documentsSection');
+    const teamsSection      = document.getElementById('teamsSection');
+    const emailSection      = document.getElementById('emailSection');
+    const noResults         = document.getElementById('noResults');
+    const documentsResults  = document.getElementById('documentsResults');
+    const teamsResults      = document.getElementById('teamsResults');
+    const emailResults      = document.getElementById('emailResults');
+    const documentsCount    = document.getElementById('documentsCount');
+    const teamsCount        = document.getElementById('teamsCount');
+    const emailCount        = document.getElementById('emailCount');
+
     // Checkboxes
-    const sourceSharePoint = document.getElementById('sourceSharePoint');
-    const sourceTeams = document.getElementById('sourceTeams');
-    const sourceEmail = document.getElementById('sourceEmail');
+    const sourceSharePoint  = document.getElementById('sourceSharePoint');
+    const sourceTeams       = document.getElementById('sourceTeams');
+    const sourceEmail       = document.getElementById('sourceEmail');
 
-    // Allow Enter key to trigger search
-    searchInput.addEventListener('keypress', function(e) {
-        if (e.key === 'Enter') {
-            performSearch();
-        }
+    // -------------------------------------------------------
+    // Mode toggle
+    // -------------------------------------------------------
+    window.setMode = function (mode) {
+        currentMode = mode;
+        document.getElementById('btnChat').classList.toggle('active', mode === 'chat');
+        document.getElementById('btnSearch').classList.toggle('active', mode === 'search');
+        chatPanel.style.display   = mode === 'chat'   ? 'block' : 'none';
+        searchPanel.style.display = mode === 'search' ? 'block' : 'none';
+        searchButtonText.textContent = mode === 'chat' ? 'Ask' : 'Search';
+        searchInput.placeholder = mode === 'chat'
+            ? 'Ask a question about company information...'
+            : 'Enter search keywords...';
+    };
+
+    // -------------------------------------------------------
+    // Input handling
+    // -------------------------------------------------------
+    searchInput.addEventListener('keypress', function (e) {
+        if (e.key === 'Enter') dispatch();
     });
+    searchButton.addEventListener('click', dispatch);
 
-    searchButton.addEventListener('click', performSearch);
+    function dispatch() {
+        if (currentMode === 'chat') runChat();
+        else runSearch();
+    }
 
-    async function performSearch() {
-        const query = searchInput.value.trim();
-        
-        if (!query) {
-            return;
-        }
+    function getSelectedSources() {
+        const s = [];
+        if (sourceSharePoint.checked) s.push('sharepoint');
+        if (sourceTeams.checked)      s.push('teams');
+        if (sourceEmail.checked)      s.push('email');
+        return s;
+    }
 
-        // Check which sources are enabled
-        const searchSharePoint = sourceSharePoint.checked;
-        const searchTeams = sourceTeams.checked;
-        const searchEmail = sourceEmail.checked;
+    function setLoading(on) {
+        searchButton.disabled = on;
+        searchButtonText.style.display   = on ? 'none'         : 'inline';
+        searchButtonSpinner.style.display = on ? 'inline-block' : 'none';
+    }
 
-        // Require at least one source
-        if (!searchSharePoint && !searchTeams && !searchEmail) {
-            showError('Please select at least one search source.');
-            return;
-        }
+    function showError(msg) {
+        errorDisplay.textContent = msg;
+        errorDisplay.style.display = 'block';
+    }
 
-        // Reset UI
+    function clearError() {
         errorDisplay.style.display = 'none';
+    }
+
+    // -------------------------------------------------------
+    // CHAT mode
+    // -------------------------------------------------------
+    async function runChat() {
+        const question = searchInput.value.trim();
+        if (!question) return;
+
+        const sources = getSelectedSources();
+        if (!sources.length) { showError('Please select at least one search source.'); return; }
+
+        clearError();
+        setLoading(true);
+        thinkingIndicator.style.display = 'flex';
+        searchInput.value = '';
+
+        try {
+            const response = await fetch('/graph/api/assistant/chat/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCsrfToken(),
+                },
+                body: JSON.stringify({
+                    question,
+                    sources,
+                    conversation_history: conversationHistory,
+                }),
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.error || 'Server error');
+            }
+
+            // Append turn to conversation history for follow-ups
+            conversationHistory.push({ role: 'user', content: question });
+            conversationHistory.push({ role: 'assistant', content: data.answer });
+
+            renderChatTurn(question, data);
+
+        } catch (err) {
+            showError('Error: ' + err.message);
+        } finally {
+            setLoading(false);
+            thinkingIndicator.style.display = 'none';
+        }
+    }
+
+    function renderChatTurn(question, data) {
+        // Add clear button if this is the first turn
+        if (conversationHistory.length === 2) {
+            const clearBtn = document.createElement('button');
+            clearBtn.className = 'chat-clear-btn';
+            clearBtn.textContent = 'Clear conversation';
+            clearBtn.onclick = clearConversation;
+            chatHistory.prepend(clearBtn);
+        }
+
+        const sourcesHtml = data.sources && data.sources.length
+            ? `<div class="chat-sources">
+                <div class="chat-sources-title">Sources</div>
+                ${data.sources.map(s => `
+                    <div class="chat-source-item">
+                        <span class="chat-source-idx">[${s.index}]</span>
+                        <span class="chat-source-type">${escapeHtml(s.type)}</span>
+                        <a class="chat-source-link" href="${escapeHtml(s.url)}" target="_blank" rel="noopener noreferrer"
+                           title="${escapeHtml(s.title)}">
+                            ${escapeHtml(s.title)}${s.date ? ' · ' + escapeHtml(s.date) : ''}
+                        </a>
+                    </div>
+                `).join('')}
+               </div>`
+            : '';
+
+        const keywordsHtml = data.keywords
+            ? `<div class="chat-keywords">Searched for: "${escapeHtml(data.keywords)}"</div>`
+            : '';
+
+        const turnEl = document.createElement('div');
+        turnEl.className = 'chat-turn';
+        turnEl.innerHTML = `
+            <div class="chat-question">${escapeHtml(question)}</div>
+            <div class="chat-answer">
+                ${keywordsHtml}
+                <div class="chat-answer-text">${escapeHtml(data.answer)}</div>
+                ${sourcesHtml}
+            </div>
+        `;
+
+        // Insert before the thinking indicator
+        chatHistory.appendChild(turnEl);
+        turnEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    function clearConversation() {
+        conversationHistory = [];
+        chatHistory.innerHTML = '';
+    }
+
+    // -------------------------------------------------------
+    // SEARCH mode (raw results — unchanged logic)
+    // -------------------------------------------------------
+    async function runSearch() {
+        const query = searchInput.value.trim();
+        if (!query) return;
+
+        const sources = getSelectedSources();
+        if (!sources.length) { showError('Please select at least one search source.'); return; }
+
+        clearError();
         resultsSection.classList.remove('visible');
         documentsSection.style.display = 'none';
         teamsSection.style.display = 'none';
         emailSection.style.display = 'none';
         noResults.style.display = 'none';
-
-        // Show loading state
-        searchButton.disabled = true;
-        searchButtonText.style.display = 'none';
-        searchButtonSpinner.style.display = 'inline-block';
+        setLoading(true);
 
         try {
-            // Build array of promises for selected sources
             const searchPromises = [];
-            
-            if (searchSharePoint) {
+
+            if (sources.includes('sharepoint')) {
                 searchPromises.push(
                     fetch(`/graph/api/search/global/?q=${encodeURIComponent(query)}&size=10`)
-                        .then(r => r.json())
-                        .then(data => ({ type: 'sharepoint', data }))
+                        .then(r => r.json()).then(data => ({ type: 'sharepoint', data }))
                 );
             }
-            
-            if (searchTeams) {
+            if (sources.includes('teams')) {
                 searchPromises.push(
                     fetch(`/graph/api/search/teams/?q=${encodeURIComponent(query)}&size=10`)
-                        .then(r => r.json())
-                        .then(data => ({ type: 'teams', data }))
+                        .then(r => r.json()).then(data => ({ type: 'teams', data }))
                 );
             }
-            
-            if (searchEmail) {
+            if (sources.includes('email')) {
                 searchPromises.push(
                     fetch(`/graph/api/search/email/?q=${encodeURIComponent(query)}&size=10`)
-                        .then(r => r.json())
-                        .then(data => ({ type: 'email', data }))
+                        .then(r => r.json()).then(data => ({ type: 'email', data }))
                 );
             }
 
-            // Fetch all selected searches in parallel
             const results = await Promise.all(searchPromises);
-            
-            // Organize results by type
-            const resultsByType = {
-                sharepoint: null,
-                teams: null,
-                email: null
-            };
-            
-            results.forEach(result => {
-                resultsByType[result.type] = result.data;
-            });
+            const byType = { sharepoint: null, teams: null, email: null };
+            results.forEach(r => { byType[r.type] = r.data; });
+            displaySearchResults(byType);
 
-            // Process and display results
-            displayResults(resultsByType);
-
-        } catch (error) {
-            console.error('Search error:', error);
+        } catch (err) {
             showError('An error occurred while searching. Please try again.');
         } finally {
-            // Reset button state
-            searchButton.disabled = false;
-            searchButtonText.style.display = 'inline';
-            searchButtonSpinner.style.display = 'none';
+            setLoading(false);
         }
     }
 
-    function displayResults(resultsByType) {
+    function displaySearchResults(byType) {
         resultsSection.classList.add('visible');
 
-        // Extract results from API responses
-        const globalHits = resultsByType.sharepoint ? extractHits(resultsByType.sharepoint) : [];
-        const teamsHits = resultsByType.teams ? extractHits(resultsByType.teams) : [];
-        const emailHits = resultsByType.email ? extractHits(resultsByType.email) : [];
+        const globalHits = byType.sharepoint ? extractHits(byType.sharepoint) : [];
+        const teamsHits  = byType.teams       ? extractHits(byType.teams)      : [];
+        const emailHits  = byType.email       ? extractHits(byType.email)      : [];
 
-        // Display SharePoint/global search results (documents, sites, lists)
         if (globalHits.length > 0) {
             documentsSection.style.display = 'block';
             documentsCount.textContent = globalHits.length;
-            documentsResults.innerHTML = globalHits.map(hit => renderDocumentResult(hit)).join('');
+            documentsResults.innerHTML = globalHits.map(renderDocumentResult).join('');
         }
-
-        // Display Teams chat results
         if (teamsHits.length > 0) {
             teamsSection.style.display = 'block';
             teamsCount.textContent = teamsHits.length;
-            teamsResults.innerHTML = teamsHits.map(hit => renderTeamsResult(hit)).join('');
+            teamsResults.innerHTML = teamsHits.map(renderTeamsResult).join('');
         }
-
-        // Display Email results
         if (emailHits.length > 0) {
             emailSection.style.display = 'block';
             emailCount.textContent = emailHits.length;
-            emailResults.innerHTML = emailHits.map(hit => renderEmailResult(hit)).join('');
+            emailResults.innerHTML = emailHits.map(renderEmailResult).join('');
         }
-
-        // Show "no results" if all are empty
-        if (globalHits.length === 0 && teamsHits.length === 0 && emailHits.length === 0) {
+        if (!globalHits.length && !teamsHits.length && !emailHits.length) {
             noResults.style.display = 'block';
         }
     }
 
     function extractHits(data) {
-        // Navigate the Microsoft Search API response structure
-        if (!data || !data.value || !Array.isArray(data.value)) {
-            return [];
-        }
-
+        if (!data || !data.value) return [];
         const hits = [];
-        for (const request of data.value) {
-            if (request.hitsContainers && Array.isArray(request.hitsContainers)) {
-                for (const container of request.hitsContainers) {
-                    if (container.hits && Array.isArray(container.hits)) {
-                        hits.push(...container.hits);
-                    }
-                }
+        for (const req of data.value) {
+            for (const container of req.hitsContainers || []) {
+                hits.push(...(container.hits || []));
             }
         }
         return hits;
     }
 
     function renderDocumentResult(hit) {
-        const resource = hit.resource || {};
-        const title = resource.name || resource.title || resource.displayName || 'Untitled';
-        const webUrl = resource.webUrl || '#';
-        const summary = resource.summary || '';
-        const lastModified = resource.lastModifiedDateTime || resource.createdDateTime;
-        const modifiedBy = resource.lastModifiedBy?.user?.displayName || '';
-        
-        let metaParts = [];
-        if (lastModified) {
-            const date = new Date(lastModified);
-            metaParts.push(`Modified ${date.toLocaleDateString()}`);
-        }
-        if (modifiedBy) {
-            metaParts.push(`by ${modifiedBy}`);
-        }
-        
-        return `
-            <div class="result-item">
-                <div class="result-title">
-                    <a href="${escapeHtml(webUrl)}" target="_blank" rel="noopener noreferrer">
-                        ${escapeHtml(title)}
-                    </a>
-                </div>
-                ${metaParts.length > 0 ? `<div class="result-meta">${escapeHtml(metaParts.join(' '))}</div>` : ''}
-                ${summary ? `<div class="result-summary">${escapeHtml(summary)}</div>` : ''}
-            </div>
-        `;
+        const r = hit.resource || {};
+        const title = r.name || r.title || r.displayName || 'Untitled';
+        const url   = r.webUrl || '#';
+        const summary = hit.summary || '';
+        const modified = r.lastModifiedDateTime || r.createdDateTime;
+        const by = r.lastModifiedBy?.user?.displayName || '';
+        const meta = [modified ? `Modified ${new Date(modified).toLocaleDateString()}` : '', by ? `by ${by}` : ''].filter(Boolean).join(' ');
+        return `<div class="result-item">
+            <div class="result-title"><a href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(title)}</a></div>
+            ${meta ? `<div class="result-meta">${escapeHtml(meta)}</div>` : ''}
+            ${summary ? `<div class="result-summary">${escapeHtml(summary)}</div>` : ''}
+        </div>`;
     }
 
     function renderTeamsResult(hit) {
-        const resource = hit.resource || {};
-        const summary = hit.summary || '';
-        const from = resource.from?.user?.displayName || resource.from?.emailAddress?.name || 'Unknown';
-        const subject = resource.subject || '';
-        const createdDateTime = resource.createdDateTime;
-        const webUrl = resource.webLink || resource.webUrl || '#';
-        
-        let title = subject || 'Chat Message';
-        if (from) {
-            title = `${from}: ${subject || 'Message'}`;
-        }
-        
-        let metaParts = [];
-        if (createdDateTime) {
-            const date = new Date(createdDateTime);
-            metaParts.push(date.toLocaleString());
-        }
-        
-        return `
-            <div class="result-item">
-                <div class="result-title">
-                    <a href="${escapeHtml(webUrl)}" target="_blank" rel="noopener noreferrer">
-                        ${escapeHtml(title)}
-                    </a>
-                </div>
-                ${metaParts.length > 0 ? `<div class="result-meta">${escapeHtml(metaParts.join(' '))}</div>` : ''}
-                ${summary ? `<div class="result-summary">${escapeHtml(summary)}</div>` : ''}
-            </div>
-        `;
+        const r = hit.resource || {};
+        const from = r.from?.user?.displayName || r.from?.emailAddress?.name || 'Unknown';
+        const subject = r.subject || 'Message';
+        const url = r.webLink || r.webUrl || '#';
+        const date = r.createdDateTime ? new Date(r.createdDateTime).toLocaleString() : '';
+        return `<div class="result-item">
+            <div class="result-title"><a href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(from + ': ' + subject)}</a></div>
+            ${date ? `<div class="result-meta">${escapeHtml(date)}</div>` : ''}
+            ${hit.summary ? `<div class="result-summary">${escapeHtml(hit.summary)}</div>` : ''}
+        </div>`;
     }
 
     function renderEmailResult(hit) {
-        const resource = hit.resource || {};
-        const summary = hit.summary || '';
-        const from = resource.from?.emailAddress?.name || 'Unknown';
-        const subject = resource.subject || 'No Subject';
-        const receivedDateTime = resource.receivedDateTime;
-        const webUrl = resource.webLink || '#';
-        
-        let metaParts = [];
-        metaParts.push(`From: ${from}`);
-        if (receivedDateTime) {
-            const date = new Date(receivedDateTime);
-            metaParts.push(date.toLocaleString());
-        }
-        
-        return `
-            <div class="result-item">
-                <div class="result-title">
-                    <a href="${escapeHtml(webUrl)}" target="_blank" rel="noopener noreferrer">
-                        ${escapeHtml(subject)}
-                    </a>
-                </div>
-                ${metaParts.length > 0 ? `<div class="result-meta">${escapeHtml(metaParts.join(' • '))}</div>` : ''}
-                ${summary ? `<div class="result-summary">${escapeHtml(summary)}</div>` : ''}
-            </div>
-        `;
+        const r = hit.resource || {};
+        const from = r.from?.emailAddress?.name || 'Unknown';
+        const subject = r.subject || 'No Subject';
+        const url = r.webLink || '#';
+        const date = r.receivedDateTime ? new Date(r.receivedDateTime).toLocaleString() : '';
+        return `<div class="result-item">
+            <div class="result-title"><a href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(subject)}</a></div>
+            <div class="result-meta">${escapeHtml('From: ' + from + (date ? ' • ' + date : ''))}</div>
+            ${hit.summary ? `<div class="result-summary">${escapeHtml(hit.summary)}</div>` : ''}
+        </div>`;
     }
 
-    function showError(message) {
-        errorDisplay.textContent = message;
-        errorDisplay.style.display = 'block';
+    // -------------------------------------------------------
+    // Utilities
+    // -------------------------------------------------------
+    function getCsrfToken() {
+        const cookie = document.cookie.split(';').find(c => c.trim().startsWith('csrftoken='));
+        return cookie ? cookie.split('=')[1] : '';
     }
 
     function escapeHtml(text) {
         const div = document.createElement('div');
-        div.textContent = text;
+        div.textContent = String(text || '');
         return div.innerHTML;
     }
 });

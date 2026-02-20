@@ -7,6 +7,7 @@ from django.http import JsonResponse, HttpResponse
 from django.views import View
 from django.contrib.auth.decorators import login_required
 from django.utils.decorators import method_decorator
+from django.utils.http import url_has_allowed_host_and_scheme
 
 from .services_delegated import GraphServiceDelegated
 
@@ -20,6 +21,15 @@ class GraphLoginView(View):
         """
         Redirect user to Microsoft login page
         """
+        # Preserve explicit return target (used by client-side re-auth links)
+        next_url = request.GET.get('next')
+        if next_url and url_has_allowed_host_and_scheme(
+            url=next_url,
+            allowed_hosts={request.get_host()},
+            require_https=request.is_secure(),
+        ):
+            request.session['graph_next'] = next_url
+
         # Generate state for CSRF protection
         state = secrets.token_urlsafe(16)
         request.session['oauth_state'] = state
@@ -233,7 +243,19 @@ class CompanyAssistantView(View):
 
         if not access_token:
             # Store intended destination and redirect to login
-            request.session['graph_next'] = 'msgraph:company-assistant'
+            request.session['graph_next'] = request.path
+            return redirect('msgraph:graph-login')
+
+        # Validate token up front so first page load is seamless and search
+        # calls do not fail with an auth error after rendering.
+        try:
+            graph_service = GraphServiceDelegated()
+            graph_service.get_my_profile(access_token)
+        except Exception:
+            request.session.pop('graph_access_token', None)
+            request.session.pop('graph_refresh_token', None)
+            request.session.pop('graph_token_expires_in', None)
+            request.session['graph_next'] = request.path
             return redirect('msgraph:graph-login')
 
         # Render the template - searches will be performed via AJAX

@@ -31,6 +31,7 @@ from .api_views import (
     TeamsSearchAPIView,
     EmailSearchAPIView,
     AssistantChatAPIView,
+    AssistantSearchLogAPIView,
     ExpenseReceiptsAPIView,
     DownloadFileAPIView,
     UploadReceiptToQuickBooksAPIView,
@@ -93,6 +94,7 @@ urlpatterns = [
     path('api/search/teams/', TeamsSearchAPIView.as_view(), name='api-teams-search'),
     path('api/search/email/', EmailSearchAPIView.as_view(), name='api-email-search'),
     path('api/assistant/chat/', AssistantChatAPIView.as_view(), name='api-assistant-chat'),
+    path('api/assistant/search-log/', AssistantSearchLogAPIView.as_view(), name='api-assistant-search-log'),
     
     # Expense Receipts API
     path('api/receipts/expense/', ExpenseReceiptsAPIView.as_view(), name='api-expense-receipts'),

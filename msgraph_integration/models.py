@@ -3,6 +3,7 @@ Microsoft Graph Integration Models
 """
 from django.db import models
 from django.utils import timezone
+from django.conf import settings
 import secrets
 
 
@@ -99,3 +100,40 @@ class TeamsWebhookNotification(models.Model):
     def __str__(self):
         return f"Notification {self.change_type} - {self.resource_data_id or 'N/A'} at {self.received_at}"
 
+
+class CompanyAssistantSearchLog(models.Model):
+    """
+    Audit log for Company Assistant searches.
+    """
+
+    REQUEST_TYPE_CHAT = "chat"
+    REQUEST_TYPE_RAW_SEARCH = "raw_search"
+    REQUEST_TYPE_CHOICES = [
+        (REQUEST_TYPE_CHAT, "Chat"),
+        (REQUEST_TYPE_RAW_SEARCH, "Raw Search"),
+    ]
+
+    requested_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    query = models.TextField()
+    request_type = models.CharField(max_length=20, choices=REQUEST_TYPE_CHOICES, db_index=True)
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="company_assistant_search_logs",
+    )
+    account_identifier = models.CharField(
+        max_length=255,
+        blank=True,
+        help_text="User email or account name captured at request time.",
+    )
+
+    class Meta:
+        ordering = ["-requested_at"]
+        indexes = [
+            models.Index(fields=["request_type", "-requested_at"]),
+        ]
+
+    def __str__(self):
+        return f"{self.get_request_type_display()} - {self.account_identifier or 'unknown'} - {self.requested_at}"

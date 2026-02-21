@@ -596,6 +596,34 @@ document.addEventListener('DOMContentLoaded', function () {
         return s;
     }
 
+    async function logRawSearch(query) {
+        try {
+            const response = await fetch('/graph/api/assistant/search-log/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCsrfToken(),
+                },
+                body: JSON.stringify({ query }),
+            });
+
+            let data = {};
+            const contentType = response.headers.get('content-type') || '';
+            if (contentType.includes('application/json')) {
+                data = await response.json();
+            }
+
+            if (data.auth_required || response.status === 401) {
+                throw { authRequired: true, loginUrl: data.login_url };
+            }
+        } catch (err) {
+            if (err && err.authRequired) {
+                throw err;
+            }
+            // Logging failures should not block search execution.
+        }
+    }
+
     function setLoading(on) {
         searchButton.disabled = on;
         searchButtonText.style.display   = on ? 'none'         : 'inline';
@@ -758,6 +786,7 @@ document.addEventListener('DOMContentLoaded', function () {
         setLoading(true);
 
         try {
+            await logRawSearch(query);
             const searchPromises = [];
 
             const authCheck = async (url, type) => {

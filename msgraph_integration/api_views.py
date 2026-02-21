@@ -4,6 +4,7 @@ Uses tokens from authenticated user session
 """
 import re
 from typing import List, Dict, Any
+import logging
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
@@ -17,6 +18,46 @@ from django.utils.decorators import method_decorator
 
 from .services_delegated import GraphServiceDelegated, GraphTokenExpiredError
 from .serializers import UserProfileSerializer
+from .models import CompanyAssistantSearchLog
+
+
+logger = logging.getLogger(__name__)
+
+
+def _resolve_account_identifier(request) -> str:
+    """
+    Resolve an account identifier for audit logging.
+    Prefers Django user email, then username.
+    """
+    user = getattr(request, "user", None)
+    if user and user.is_authenticated:
+        if getattr(user, "email", None):
+            return user.email
+        if getattr(user, "username", None):
+            return user.username
+        return str(user.pk)
+
+    return ""
+
+
+def _log_company_assistant_search(request, query: str, request_type: str) -> None:
+    """
+    Best-effort audit logging for company assistant requests.
+    """
+    cleaned_query = (query or "").strip()
+    if not cleaned_query:
+        return
+
+    try:
+        user = request.user if getattr(request, "user", None) and request.user.is_authenticated else None
+        CompanyAssistantSearchLog.objects.create(
+            query=cleaned_query,
+            request_type=request_type,
+            user=user,
+            account_identifier=_resolve_account_identifier(request),
+        )
+    except Exception:
+        logger.exception("Failed to create CompanyAssistantSearchLog record.")
 
 
 def parse_amount_from_filename(filename):
@@ -1300,6 +1341,12 @@ class AssistantChatAPIView(APIView):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
+        _log_company_assistant_search(
+            request=request,
+            query=question,
+            request_type=CompanyAssistantSearchLog.REQUEST_TYPE_CHAT,
+        )
+
         sources = request.data.get('sources', ['sharepoint', 'teams', 'email'])
         conversation_history = request.data.get('conversation_history', [])
 
@@ -1372,6 +1419,47 @@ class AssistantChatAPIView(APIView):
                 {'error': str(e)},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
+
+
+class AssistantSearchLogAPIView(APIView):
+    """
+    Log raw Company Assistant search requests for audit visibility in admin.
+    """
+    permission_classes = [AllowAny]
+    renderer_classes = [JSONRenderer]
+
+    @extend_schema(
+        summary="Log Company Assistant Search",
+        description="""
+        Internal endpoint used by the Company Assistant UI to audit raw-search
+        requests. Stores query text, timestamp, request type, and user identity.
+        """,
+        request=dict,
+        responses={200: dict},
+        tags=['Microsoft Graph - Search']
+    )
+    def post(self, request):
+        access_token = request.session.get('graph_access_token')
+        if not access_token:
+            return Response(
+                {'error': 'Not authenticated with Microsoft', 'login_url': '/graph/login/'},
+                status=status.HTTP_401_UNAUTHORIZED
+            )
+
+        query = request.data.get('query', '').strip()
+        if not query:
+            return Response(
+                {'error': 'Missing required field: query'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        _log_company_assistant_search(
+            request=request,
+            query=query,
+            request_type=CompanyAssistantSearchLog.REQUEST_TYPE_RAW_SEARCH,
+        )
+
+        return Response({'ok': True}, status=status.HTTP_200_OK)
 
 
 class ExpenseReceiptsAPIView(APIView):

@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import GraphSubscription, TeamsWebhookNotification
+from .models import GraphSubscription, TeamsWebhookNotification, CompanyAssistantSearchLog
 
 
 @admin.register(GraphSubscription)
@@ -57,3 +57,17 @@ class TeamsWebhookNotificationAdmin(admin.ModelAdmin):
         }),
     )
 
+
+@admin.register(CompanyAssistantSearchLog)
+class CompanyAssistantSearchLogAdmin(admin.ModelAdmin):
+    list_display = ('requested_at', 'request_type', 'account_identifier', 'query_preview')
+    list_filter = ('request_type', 'requested_at')
+    search_fields = ('account_identifier', 'query', 'user__username', 'user__email')
+    readonly_fields = ('requested_at', 'request_type', 'query', 'user', 'account_identifier')
+    ordering = ('-requested_at',)
+    list_per_page = 50
+
+    def query_preview(self, obj):
+        return obj.query[:120] + ('...' if len(obj.query) > 120 else '')
+
+    query_preview.short_description = 'Query'

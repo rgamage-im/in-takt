@@ -475,3 +475,55 @@ def delete_document(request):
     
     return render(request, "search/delete_result_partial.html", context)
 
+
+@login_required
+@require_http_methods(["POST"])
+def delete_index(request):
+    """HTMX endpoint to delete the entire search index"""
+    headers = {"X-API-Key": settings.RAG_API_KEY}
+    url = f"{settings.RAG_API_BASE_URL}/api/v1/ingest/delete-index"
+
+    try:
+        # Prefer POST for command-style endpoints, fall back to DELETE if backend requires it.
+        response = requests.post(url, headers=headers, timeout=RAG_API_TIMEOUT)
+        if response.status_code == 405:
+            response = requests.delete(url, headers=headers, timeout=RAG_API_TIMEOUT)
+        response.raise_for_status()
+
+        try:
+            data = response.json()
+        except ValueError:
+            data = {}
+
+        context = {
+            "success": True,
+            "deleted_documents": data.get("deleted_documents"),
+            "deleted_chunks": data.get("deleted_chunks"),
+            "error": None
+        }
+    except requests.exceptions.Timeout:
+        context = {
+            "error": "Delete index request timed out.",
+            "success": False
+        }
+    except requests.exceptions.ConnectionError:
+        context = {
+            "error": "Cannot connect to RAG API. Please check if the service is running.",
+            "success": False
+        }
+    except requests.exceptions.HTTPError as e:
+        try:
+            error_detail = e.response.json().get("detail", str(e))
+        except Exception:
+            error_detail = str(e)
+        context = {
+            "error": f"Delete index failed: {error_detail}",
+            "success": False
+        }
+    except Exception as e:
+        context = {
+            "error": f"Unexpected error: {str(e)}",
+            "success": False
+        }
+
+    return render(request, "search/delete_index_result_partial.html", context)

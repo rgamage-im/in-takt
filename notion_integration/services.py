@@ -2,7 +2,9 @@
 Notion API service helpers.
 """
 import os
-from typing import Any, Dict, Optional
+import logging
+import time
+from typing import Any, Dict, Generator, Optional
 
 import requests
 
@@ -37,9 +39,54 @@ class NotionService:
         json: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         url = f"{self.base_url}{path}"
-        response = requests.request(method, url, headers=self._headers, params=params, json=json, timeout=15)
-        response.raise_for_status()
-        return response.json()
+        logger = logging.getLogger(__name__)
+        max_retries = int(os.getenv("NOTION_API_MAX_RETRIES", "4"))
+        base_delay_seconds = float(os.getenv("NOTION_API_RETRY_BASE_DELAY_SECONDS", "1"))
+        max_delay_seconds = float(os.getenv("NOTION_API_RETRY_MAX_DELAY_SECONDS", "20"))
+        retryable_status_codes = {429, 500, 502, 503, 504}
+
+        last_response = None
+
+        for attempt in range(max_retries + 1):
+            response = requests.request(method, url, headers=self._headers, params=params, json=json, timeout=15)
+            last_response = response
+
+            if response.status_code in retryable_status_codes and attempt < max_retries:
+                retry_after = self._parse_retry_after_seconds(response.headers.get("Retry-After"))
+                backoff_seconds = min(base_delay_seconds * (2 ** attempt), max_delay_seconds)
+                sleep_seconds = retry_after if retry_after is not None else backoff_seconds
+
+                logger.warning(
+                    "notion_api_retry method=%s path=%s status=%s attempt=%s/%s sleep_seconds=%s",
+                    method,
+                    path,
+                    response.status_code,
+                    attempt + 1,
+                    max_retries + 1,
+                    sleep_seconds,
+                )
+                time.sleep(sleep_seconds)
+                continue
+
+            response.raise_for_status()
+            return response.json()
+
+        # Defensive fallback; loop should return or raise above.
+        if last_response is not None:
+            last_response.raise_for_status()
+        raise RuntimeError("Notion request failed after retries")
+
+    @staticmethod
+    def _parse_retry_after_seconds(value: Optional[str]) -> Optional[float]:
+        if not value:
+            return None
+        try:
+            seconds = float(value)
+            if seconds < 0:
+                return None
+            return seconds
+        except (TypeError, ValueError):
+            return None
 
     def search(
         self,
@@ -71,6 +118,26 @@ class NotionService:
         """
         return self._request("GET", f"/pages/{page_id}")
 
+    def retrieve_database(self, database_id: str) -> Dict[str, Any]:
+        """
+        Get database metadata.
+        """
+        return self._request("GET", f"/databases/{database_id}")
+
+    def query_database(
+        self,
+        database_id: str,
+        page_size: int = 100,
+        start_cursor: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """
+        Query rows in a database.
+        """
+        payload: Dict[str, Any] = {"page_size": min(max(page_size, 1), 100)}
+        if start_cursor:
+            payload["start_cursor"] = start_cursor
+        return self._request("POST", f"/databases/{database_id}/query", json=payload)
+
     def list_block_children(
         self,
         block_id: str,
@@ -85,13 +152,21 @@ class NotionService:
             params["start_cursor"] = start_cursor
         return self._request("GET", f"/blocks/{block_id}/children", params=params)
 
-    def get_page_content(self, page_id: str, recursive: bool = True) -> Dict[str, Any]:
+    def get_page_content(
+        self,
+        page_id: str,
+        recursive: bool = True,
+        max_blocks: int = 5000,
+        max_depth: int = 20,
+    ) -> Dict[str, Any]:
         """
         Get full page content including metadata and all blocks.
         
         Args:
             page_id: The Notion page ID
             recursive: If True, fetches nested blocks recursively
+            max_blocks: Maximum total blocks to traverse for this page
+            max_depth: Maximum child nesting depth when traversing blocks
             
         Returns:
             Dict containing:
@@ -102,8 +177,28 @@ class NotionService:
         # Get page metadata
         page_metadata = self.retrieve_page(page_id)
         
-        # Get all blocks
-        all_blocks = self._get_all_blocks_recursive(page_id, recursive=recursive)
+        # Get all blocks with recursion safety guards
+        logger = logging.getLogger(__name__)
+        state = {
+            "count": 0,
+            "max_blocks": max_blocks,
+            "max_depth": max_depth,
+            "visited_block_ids": set(),
+        }
+        all_blocks = self._get_all_blocks_recursive(
+            page_id,
+            recursive=recursive,
+            depth=0,
+            state=state,
+        )
+        logger.info(
+            "notion_page_fetch page_id=%s recursive=%s blocks=%s max_blocks=%s max_depth=%s",
+            page_id,
+            recursive,
+            state["count"],
+            max_blocks,
+            max_depth,
+        )
         
         # Extract plain text from blocks
         text_content = self._extract_text_from_blocks(all_blocks)
@@ -115,14 +210,26 @@ class NotionService:
         }
     
     def _get_all_blocks_recursive(
-        self, 
-        block_id: str, 
-        recursive: bool = True
+        self,
+        block_id: str,
+        recursive: bool = True,
+        depth: int = 0,
+        state: Optional[Dict[str, Any]] = None,
     ) -> list[Dict[str, Any]]:
         """
         Recursively fetch all blocks and their children.
         """
         all_blocks = []
+        if state is None:
+            state = {"count": 0, "max_blocks": 5000, "max_depth": 20, "visited_block_ids": set()}
+
+        if block_id in state["visited_block_ids"]:
+            return all_blocks
+        state["visited_block_ids"].add(block_id)
+
+        if depth > state["max_depth"]:
+            return all_blocks
+
         has_more = True
         start_cursor = None
         
@@ -136,13 +243,18 @@ class NotionService:
             blocks = response.get("results", [])
             
             for block in blocks:
+                if state["count"] >= state["max_blocks"]:
+                    return all_blocks
                 all_blocks.append(block)
+                state["count"] += 1
                 
                 # If block has children and recursive is enabled, fetch them
                 if recursive and block.get("has_children", False):
                     child_blocks = self._get_all_blocks_recursive(
-                        block["id"], 
-                        recursive=True
+                        block["id"],
+                        recursive=True,
+                        depth=depth + 1,
+                        state=state,
                     )
                     # Add children to the block
                     block["children"] = child_blocks
@@ -155,7 +267,7 @@ class NotionService:
     
     def _extract_text_from_blocks(self, blocks: list[Dict[str, Any]]) -> str:
         """
-        Extract plain text content from Notion blocks.
+        Extract plain text and linkable resource references from Notion blocks.
         """
         text_parts = []
         
@@ -169,8 +281,14 @@ class NotionService:
             # Extract text from rich text arrays
             if "rich_text" in block_content:
                 for text_obj in block_content["rich_text"]:
-                    if text_obj.get("type") == "text":
-                        text_parts.append(text_obj.get("text", {}).get("content", ""))
+                    plain_text = text_obj.get("plain_text") or text_obj.get("text", {}).get("content", "")
+                    if plain_text:
+                        text_parts.append(plain_text)
+
+                    # Preserve inline links so downstream retrieval can cite external URLs.
+                    href = text_obj.get("href") or text_obj.get("text", {}).get("link", {}).get("url")
+                    if href:
+                        text_parts.append(f"[Link] {href}")
             
             # Handle special block types
             elif block_type == "child_page":
@@ -178,8 +296,47 @@ class NotionService:
             
             elif block_type == "child_database":
                 text_parts.append(f"[Child Database: {block_content.get('title', '')}]")
+
+            # Preserve URLs from external resources (images/files/embeds/bookmarks/etc).
+            resource_url = self._extract_block_url(block_type, block_content)
+            if resource_url:
+                text_parts.append(f"[{block_type} URL] {resource_url}")
+
+            # Include captions where available (common on image/file/media blocks).
+            caption_parts = block_content.get("caption", [])
+            if caption_parts:
+                caption_text = " ".join(part.get("plain_text", "") for part in caption_parts).strip()
+                if caption_text:
+                    text_parts.append(f"[{block_type} Caption] {caption_text}")
         
         return "\n".join(text_parts)
+
+    @staticmethod
+    def _extract_block_url(block_type: str, block_content: Dict[str, Any]) -> str:
+        """
+        Extract URL from Notion block payload when present.
+        """
+        # Common direct URL field (bookmark, embed, link_preview, etc.)
+        direct_url = block_content.get("url")
+        if direct_url:
+            return str(direct_url)
+
+        # Notion file-style objects (image/file/video/pdf/audio) can have `external.url` or `file.url`.
+        external = block_content.get("external")
+        if isinstance(external, dict) and external.get("url"):
+            return str(external["url"])
+
+        file_obj = block_content.get("file")
+        if isinstance(file_obj, dict) and file_obj.get("url"):
+            return str(file_obj["url"])
+
+        # Some link-like block types may expose nested link metadata.
+        if block_type in {"link_to_page"}:
+            page_id = block_content.get("page_id")
+            if page_id:
+                return f"https://www.notion.so/{page_id.replace('-', '')}"
+
+        return ""
     
     def append_blocks_to_page(
         self, 
@@ -279,3 +436,70 @@ class NotionService:
             }
         }
 
+    def iterate_search_results(
+        self,
+        query: str = "",
+        filter_type: Optional[str] = None,
+        page_size: int = 100,
+    ) -> Generator[Dict[str, Any], None, None]:
+        """
+        Iterate all Notion search results using cursor pagination.
+        """
+        start_cursor: Optional[str] = None
+
+        while True:
+            response = self.search(
+                query=query,
+                page_size=page_size,
+                start_cursor=start_cursor,
+                filter_type=filter_type,
+            )
+            for result in response.get("results", []):
+                yield result
+
+            if not response.get("has_more"):
+                break
+            start_cursor = response.get("next_cursor")
+            if not start_cursor:
+                break
+
+    @staticmethod
+    def extract_title(obj: Dict[str, Any]) -> str:
+        """
+        Extract a human-readable title from a Notion page or database object.
+        """
+        title_from_property = ""
+        properties = obj.get("properties", {})
+
+        if obj.get("object") == "page":
+            title_candidates = [
+                value for value in properties.values() if isinstance(value, dict) and value.get("type") == "title"
+            ]
+            if title_candidates:
+                rich = title_candidates[0].get("title", [])
+                title_from_property = "".join(part.get("plain_text", "") for part in rich).strip()
+        elif obj.get("object") == "database":
+            rich = obj.get("title", [])
+            title_from_property = "".join(part.get("plain_text", "") for part in rich).strip()
+
+        return title_from_property
+
+    @staticmethod
+    def extract_parent_info(obj: Dict[str, Any]) -> tuple[str, str]:
+        """
+        Extract normalized parent type/id from Notion object payload.
+        """
+        parent = obj.get("parent", {}) or {}
+        parent_type = parent.get("type", "")
+        parent_id = ""
+
+        if parent_type == "database_id":
+            parent_id = parent.get("database_id", "")
+        elif parent_type == "page_id":
+            parent_id = parent.get("page_id", "")
+        elif parent_type == "block_id":
+            parent_id = parent.get("block_id", "")
+        elif parent_type == "workspace":
+            parent_id = "workspace"
+
+        return parent_type, parent_id

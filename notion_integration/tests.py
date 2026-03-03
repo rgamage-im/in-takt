@@ -10,6 +10,7 @@ from django.utils import timezone
 from .models import NotionContent, NotionSyncJob
 from .services import NotionService
 from .api_views import _run_sync_job_worker
+from .apps import reconcile_stale_sync_jobs
 
 
 class NotionAPITestCase(TestCase):
@@ -277,6 +278,42 @@ class NotionAPITestCase(TestCase):
         self.assertEqual(job.status, NotionSyncJob.STATUS_CANCELED)
         self.assertTrue(job.result.get("canceled"))
         self.assertIsNotNone(job.finished_at)
+
+    def test_reconcile_stale_sync_jobs_marks_running_and_queued_failed(self):
+        stale_running = NotionSyncJob.objects.create(
+            job_id="job-stale-running",
+            created_by=self.user,
+            status=NotionSyncJob.STATUS_RUNNING,
+            started_at=timezone.now(),
+            finished_at=None,
+        )
+        stale_queued = NotionSyncJob.objects.create(
+            job_id="job-stale-queued",
+            created_by=self.user,
+            status=NotionSyncJob.STATUS_QUEUED,
+            finished_at=None,
+        )
+        completed = NotionSyncJob.objects.create(
+            job_id="job-completed",
+            created_by=self.user,
+            status=NotionSyncJob.STATUS_SUCCEEDED,
+            finished_at=timezone.now(),
+        )
+
+        updated = reconcile_stale_sync_jobs()
+        self.assertEqual(updated, 2)
+
+        stale_running.refresh_from_db()
+        stale_queued.refresh_from_db()
+        completed.refresh_from_db()
+
+        self.assertEqual(stale_running.status, NotionSyncJob.STATUS_FAILED)
+        self.assertEqual(stale_queued.status, NotionSyncJob.STATUS_FAILED)
+        self.assertIsNotNone(stale_running.finished_at)
+        self.assertIsNotNone(stale_queued.finished_at)
+        self.assertIn("interrupted by app restart", stale_running.error_message)
+        self.assertIn("interrupted by app restart", stale_queued.error_message)
+        self.assertEqual(completed.status, NotionSyncJob.STATUS_SUCCEEDED)
 
     def test_sync_active_job_returns_latest_for_user(self):
         self.client.force_authenticate(self.user)

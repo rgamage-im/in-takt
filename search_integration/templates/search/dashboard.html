@@ -350,12 +350,15 @@
                 <div class="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
                     <div><strong>Job:</strong> <span id="notion-job-id">—</span></div>
                     <div><strong>Status:</strong> <span id="notion-job-status">—</span></div>
+                    <div><strong>Created At:</strong> <span id="notion-created-at">—</span></div>
+                    <div><strong>Started At:</strong> <span id="notion-started-at">—</span></div>
+                    <div><strong>Finished At:</strong> <span id="notion-finished-at">—</span></div>
                     <div><strong>Discovered:</strong> <span id="notion-discovered">—</span></div>
                     <div><strong>Processed:</strong> <span id="notion-processed">—</span></div>
-                    <div><strong>Started:</strong> <span id="notion-started">—</span></div>
-                    <div><strong>Finished:</strong> <span id="notion-finished">—</span></div>
-                    <div><strong>Created:</strong> <span id="notion-created">—</span></div>
-                    <div><strong>Updated:</strong> <span id="notion-updated">—</span></div>
+                    <div><strong>Items Started:</strong> <span id="notion-items-started">—</span></div>
+                    <div><strong>Items Finished:</strong> <span id="notion-items-finished">—</span></div>
+                    <div><strong>Items Created:</strong> <span id="notion-created">—</span></div>
+                    <div><strong>Items Updated:</strong> <span id="notion-updated">—</span></div>
                     <div><strong>Ingested:</strong> <span id="notion-ingested">—</span></div>
                     <div><strong>Errors:</strong> <span id="notion-errors">—</span></div>
                 </div>
@@ -422,6 +425,23 @@ function notionSetInlineStatus(text) {
     if (el) el.textContent = text;
 }
 
+function notionFormatPst(isoValue) {
+    if (!isoValue) return '—';
+    const date = new Date(isoValue);
+    if (Number.isNaN(date.getTime())) return '—';
+    return new Intl.DateTimeFormat('en-US', {
+        timeZone: 'America/Los_Angeles',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: true,
+        timeZoneName: 'short',
+    }).format(date);
+}
+
 function notionShowCancelButton(show, disabled = false, label = 'Cancel Sync') {
     const btn = document.getElementById('cancel-notion-sync-btn');
     if (!btn) return;
@@ -451,16 +471,21 @@ function notionUpdateStatusPanel(jobPayload) {
     const startedCount = progressTail.filter(e => e.event === 'item_started').length;
     const finishedCount = progressTail.filter(e => e.event === 'item_finished').length;
     const failedCount = progressTail.filter(e => e.event === 'item_failed').length;
+    const createdCountFromEvents = progressTail.filter(e => e.event === 'item_finished' && e.status === 'created').length;
+    const updatedCountFromEvents = progressTail.filter(e => e.event === 'item_finished' && e.status === 'updated').length;
     const ingestResult = result.ingest_result || {};
 
     document.getElementById('notion-job-id').textContent = jobId;
     document.getElementById('notion-job-status').textContent = status;
+    document.getElementById('notion-created-at').textContent = notionFormatPst(jobPayload.created_at);
+    document.getElementById('notion-started-at').textContent = notionFormatPst(jobPayload.started_at);
+    document.getElementById('notion-finished-at').textContent = notionFormatPst(jobPayload.finished_at);
     document.getElementById('notion-discovered').textContent = discoveredEvent ? (discoveredEvent.discovered_total ?? '—') : (result.total_discovered ?? '—');
     document.getElementById('notion-processed').textContent = result.processed ?? finishedCount ?? latestItemFinished?.processed ?? '—';
-    document.getElementById('notion-started').textContent = startedCount;
-    document.getElementById('notion-finished').textContent = finishedCount;
-    document.getElementById('notion-created').textContent = result.created ?? '—';
-    document.getElementById('notion-updated').textContent = result.updated ?? '—';
+    document.getElementById('notion-items-started').textContent = startedCount;
+    document.getElementById('notion-items-finished').textContent = finishedCount;
+    document.getElementById('notion-created').textContent = result.created ?? createdCountFromEvents ?? '—';
+    document.getElementById('notion-updated').textContent = result.updated ?? updatedCountFromEvents ?? '—';
     document.getElementById('notion-ingested').textContent = ingestResult.ingested ?? '—';
     document.getElementById('notion-errors').textContent = (result.errors_count ?? failedCount ?? 0) + (ingestResult.failed ?? 0);
 

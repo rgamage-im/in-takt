@@ -1,6 +1,7 @@
 from django.contrib import admin
 from django.utils.html import format_html
 from django.utils import timezone
+from zoneinfo import ZoneInfo
 
 from .models import NotionContent, NotionSyncJob
 
@@ -94,14 +95,16 @@ class NotionContentAdmin(admin.ModelAdmin):
 
 @admin.register(NotionSyncJob)
 class NotionSyncJobAdmin(admin.ModelAdmin):
+    PACIFIC_TZ = ZoneInfo("America/Los_Angeles")
+
     list_display = (
         "job_id",
         "status",
         "cancel_requested",
         "created_by",
-        "created_at",
-        "started_at",
-        "finished_at",
+        "created_at_pacific",
+        "started_at_pacific",
+        "finished_at_pacific",
     )
     list_filter = ("status", "created_at", "started_at", "finished_at")
     search_fields = ("job_id", "created_by__username", "created_by__email", "error_message")
@@ -114,6 +117,9 @@ class NotionSyncJobAdmin(admin.ModelAdmin):
         "cancel_requested",
         "cancel_requested_at",
         "created_by",
+        "created_at_pacific",
+        "started_at_pacific",
+        "finished_at_pacific",
         "parameters",
         "progress_log",
         "result",
@@ -126,7 +132,8 @@ class NotionSyncJobAdmin(admin.ModelAdmin):
     fieldsets = (
         ("Core", {"fields": ("job_id", "status", "created_by")}),
         ("Cancellation", {"fields": ("cancel_requested", "cancel_requested_at")}),
-        ("Timing", {"fields": ("created_at", "started_at", "finished_at")}),
+        ("Timing (Pacific)", {"fields": ("created_at_pacific", "started_at_pacific", "finished_at_pacific")}),
+        ("Timing (UTC)", {"fields": ("created_at", "started_at", "finished_at"), "classes": ("collapse",)}),
         ("Parameters", {"fields": ("parameters",)}),
         ("Progress", {"fields": ("progress_log",), "classes": ("collapse",)}),
         ("Result", {"fields": ("result",), "classes": ("collapse",)}),
@@ -155,6 +162,29 @@ class NotionSyncJobAdmin(admin.ModelAdmin):
             "delete": False,
             "view": True,
         }
+
+    def _format_pacific(self, dt):
+        if not dt:
+            return "—"
+        return timezone.localtime(dt, self.PACIFIC_TZ).strftime("%Y-%m-%d %I:%M:%S %p %Z")
+
+    def created_at_pacific(self, obj):
+        return self._format_pacific(obj.created_at)
+
+    created_at_pacific.short_description = "Created (PT)"
+    created_at_pacific.admin_order_field = "created_at"
+
+    def started_at_pacific(self, obj):
+        return self._format_pacific(obj.started_at)
+
+    started_at_pacific.short_description = "Started (PT)"
+    started_at_pacific.admin_order_field = "started_at"
+
+    def finished_at_pacific(self, obj):
+        return self._format_pacific(obj.finished_at)
+
+    finished_at_pacific.short_description = "Finished (PT)"
+    finished_at_pacific.admin_order_field = "finished_at"
 
     @admin.action(description="Request cancellation for selected queued/running jobs")
     def request_cancel_action(self, request, queryset):

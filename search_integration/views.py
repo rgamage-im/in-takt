@@ -19,6 +19,32 @@ def dashboard(request):
 
 @login_required
 @require_http_methods(["GET"])
+def rag_stats_json(request):
+    """JSON endpoint with current RAG index stats for dashboard widgets."""
+    try:
+        response = requests.get(
+            f"{settings.RAG_API_BASE_URL}/api/v1/stats",
+            headers={"X-API-Key": settings.RAG_API_KEY},
+            timeout=5,
+        )
+        response.raise_for_status()
+        stats_data = response.json()
+        documents_index = stats_data.get("documents_index", {})
+        return JsonResponse(
+            {
+                "success": True,
+                "unique_documents": documents_index.get("unique_documents"),
+                "total_chunks": documents_index.get("total_chunks"),
+                "index_size_bytes": documents_index.get("index_size_bytes"),
+            },
+            status=200,
+        )
+    except Exception as exc:
+        return JsonResponse({"success": False, "error": str(exc)}, status=502)
+
+
+@login_required
+@require_http_methods(["GET"])
 def health_status(request):
     """HTMX endpoint to fetch and render RAG API health status"""
     try:

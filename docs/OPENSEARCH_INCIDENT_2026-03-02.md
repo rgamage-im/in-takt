@@ -49,3 +49,53 @@ The RAG API health response confirmed:
    - identify unassigned shard
    - run allocation explain
    - if non-critical corrupted system index, delete and verify cluster health
+
+## Addendum (2026-03-03): Yellow Health Follow-Up
+### What Happened
+- Cluster status moved to `yellow` with one `UNASSIGNED` shard.
+- Root cause was different from the red incident:
+  - `documents` index had `pri=1, rep=1` on a single-node cluster.
+  - Primary shard was started; replica shard could not be assigned (expected on one node).
+- This is a configuration/availability mismatch, not index corruption.
+
+### Relation to 2026-03-02 Red Incident
+- **Related operational area** (OpenSearch health), but **different technical cause**:
+  - `2026-03-02 red`: corrupted SAP/system index shard.
+  - `2026-03-03 yellow`: replica shard unassignable in single-node topology.
+
+### Immediate Mitigation Used
+- Set replicas to 0 on `documents`:
+  - `PUT /documents/_settings {"index":{"number_of_replicas":0}}`
+- Cluster returned to `green`.
+
+### Prevention (Single-Node Baseline)
+1. Set default replicas to `0` for all app indices via index templates.
+2. Keep runtime guard in ingestion/index-creation code to enforce `number_of_replicas=0` on single-node deployments.
+3. Keep UI/alerts split by severity:
+   - red / unassigned primaries = critical
+   - yellow / unassigned replicas = warning (expected on single-node unless replicas are forced to 0)
+
+### Template Example (Recommended)
+Apply an index template for app indices (do once per cluster):
+
+```bash
+curl -X PUT localhost:9200/_index_template/rag-default-single-node \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "index_patterns": ["documents*", "top_queries-*"],
+    "template": {
+      "settings": {
+        "number_of_replicas": 0
+      }
+    },
+    "priority": 200
+  }'
+```
+
+For existing indices, update settings in-place:
+
+```bash
+curl -X PUT localhost:9200/documents/_settings \
+  -H 'Content-Type: application/json' \
+  -d '{"index":{"number_of_replicas":0}}'
+```

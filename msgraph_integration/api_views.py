@@ -5,6 +5,7 @@ Uses tokens from authenticated user session
 import re
 from typing import List, Dict, Any
 import logging
+import requests
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
@@ -15,6 +16,7 @@ from drf_spectacular.types import OpenApiTypes
 from django.http import HttpResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.utils.decorators import method_decorator
+from django.conf import settings
 
 from .services_delegated import GraphServiceDelegated, GraphTokenExpiredError
 from .serializers import UserProfileSerializer
@@ -22,6 +24,7 @@ from .models import CompanyAssistantSearchLog
 
 
 logger = logging.getLogger(__name__)
+RAG_API_TIMEOUT = 30
 
 
 def _resolve_account_identifier(request) -> str:
@@ -58,6 +61,53 @@ def _log_company_assistant_search(request, query: str, request_type: str) -> Non
         )
     except Exception:
         logger.exception("Failed to create CompanyAssistantSearchLog record.")
+
+
+def _search_notion_rag(query: str, user, top_k: int = 10, vector_weight: float = 0.5, use_reranking: bool = True) -> dict:
+    """
+    Query RAG API for Notion-backed indexed content.
+    """
+    payload = {
+        "query": query,
+        "top_k": top_k,
+        "vector_weight": vector_weight,
+        "use_reranking": use_reranking,
+    }
+
+    if user is not None and getattr(user, "is_authenticated", False):
+        user_email = getattr(user, "email", "")
+        user_groups = []
+        try:
+            social = user.social_auth.filter(provider="azuread-tenant-oauth2").first()
+            if social and social.extra_data:
+                user_groups = social.extra_data.get("groups", []) or []
+        except Exception:
+            user_groups = []
+
+        if user_email:
+            payload["acl_users"] = [user_email]
+        if user_groups:
+            payload["acl_groups"] = user_groups
+
+    response = requests.post(
+        f"{settings.RAG_API_BASE_URL}/api/v1/retrieve/search",
+        headers={
+            "X-API-Key": settings.RAG_API_KEY,
+            "Content-Type": "application/json",
+        },
+        json=payload,
+        timeout=RAG_API_TIMEOUT,
+    )
+    response.raise_for_status()
+    return response.json()
+
+
+def _notion_result_count(payload: dict | None) -> int:
+    if not isinstance(payload, dict):
+        return 0
+    if isinstance(payload.get("results"), list):
+        return len(payload["results"])
+    return 0
 
 
 def parse_amount_from_filename(filename):
@@ -1294,14 +1344,15 @@ class AssistantChatAPIView(APIView):
         summary="Company Assistant Chat",
         description="""
         Accepts a natural language question and selected search sources, queries
-        Microsoft 365 data (SharePoint, Teams, Email) in parallel, then uses
+        Microsoft 365 data (SharePoint, Teams, Email) plus optional Notion RAG
+        data in parallel, then uses
         GPT-4o (via GitHub Models) to synthesize a grounded answer with citations.
 
         Request body:
         ```json
         {
           "question": "What was decided about the Phoenix project budget?",
-          "sources": ["sharepoint", "teams", "email"],
+          "sources": ["sharepoint", "teams", "email", "notion"],
           "conversation_history": []
         }
         ```
@@ -1370,6 +1421,31 @@ class AssistantChatAPIView(APIView):
             def search_email():
                 return graph_service.global_search(access_token, keywords, entity_types=["message"], size=10)
 
+            def search_notion():
+                primary = _search_notion_rag(
+                    query=keywords,
+                    user=getattr(request, "user", None),
+                    top_k=10,
+                    vector_weight=0.5,
+                    use_reranking=True,
+                )
+                if _notion_result_count(primary) > 0:
+                    return primary
+
+                logger.warning(
+                    "assistant_notion_fallback query_keywords=%r query_full_question=%r reason=no_results_on_keywords",
+                    keywords,
+                    question,
+                )
+                fallback = _search_notion_rag(
+                    query=question,
+                    user=getattr(request, "user", None),
+                    top_k=10,
+                    vector_weight=0.5,
+                    use_reranking=True,
+                )
+                return fallback
+
             with concurrent.futures.ThreadPoolExecutor() as executor:
                 futures = {}
                 if 'sharepoint' in sources:
@@ -1378,11 +1454,26 @@ class AssistantChatAPIView(APIView):
                     futures['teams'] = executor.submit(search_teams)
                 if 'email' in sources:
                     futures['email'] = executor.submit(search_email)
+                if 'notion' in sources:
+                    futures['notion'] = executor.submit(search_notion)
 
+                source_timeouts = {
+                    "sharepoint": 20,
+                    "teams": 20,
+                    "email": 20,
+                    # Notion may do keyword search + fallback full-question search.
+                    "notion": 45,
+                }
                 for source_name, future in futures.items():
                     try:
-                        search_results[source_name] = future.result(timeout=15)
-                    except Exception:
+                        timeout_seconds = source_timeouts.get(source_name, 20)
+                        search_results[source_name] = future.result(timeout=timeout_seconds)
+                    except Exception as exc:
+                        logger.warning(
+                            "assistant_source_search_failed source=%s error=%s",
+                            source_name,
+                            str(exc),
+                        )
                         search_results[source_name] = None
 
             # Stage 3: Synthesize answer with citations
@@ -1391,6 +1482,7 @@ class AssistantChatAPIView(APIView):
                 sharepoint_data=search_results.get('sharepoint'),
                 teams_data=search_results.get('teams'),
                 email_data=search_results.get('email'),
+                notion_data=search_results.get('notion'),
                 conversation_history=conversation_history,
             )
 
@@ -1419,6 +1511,69 @@ class AssistantChatAPIView(APIView):
                 {'error': str(e)},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
+
+
+class NotionRAGSearchAPIView(APIView):
+    """
+    Search Notion content via RAG API for Company Assistant raw mode.
+    """
+    permission_classes = [AllowAny]
+    renderer_classes = [JSONRenderer]
+
+    @extend_schema(
+        summary="Search Notion (RAG)",
+        parameters=[
+            OpenApiParameter(
+                name="q",
+                type=OpenApiTypes.STR,
+                location=OpenApiParameter.QUERY,
+                description="Search query string",
+                required=True,
+            ),
+            OpenApiParameter(
+                name="top_k",
+                type=OpenApiTypes.INT,
+                location=OpenApiParameter.QUERY,
+                description="Max results (default 10)",
+                required=False,
+            ),
+        ],
+        responses={200: dict},
+        tags=["Microsoft Graph - Search"],
+    )
+    def get(self, request):
+        access_token = request.session.get("graph_access_token")
+        if not access_token:
+            return Response(
+                {"auth_required": True, "error": "Not authenticated with Microsoft", "login_url": "/graph/login/"},
+                status=status.HTTP_401_UNAUTHORIZED,
+            )
+
+        query = request.query_params.get("q", "").strip()
+        if not query:
+            return Response(
+                {"error": "Missing required parameter: q (search query)"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            top_k = int(request.query_params.get("top_k", 10))
+        except ValueError:
+            return Response({"error": "Invalid top_k parameter"}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            results = _search_notion_rag(
+                query=query,
+                user=getattr(request, "user", None),
+                top_k=top_k,
+                vector_weight=0.5,
+                use_reranking=True,
+            )
+            return Response(results, status=status.HTTP_200_OK)
+        except requests.exceptions.RequestException as exc:
+            return Response({"error": f"Notion RAG search failed: {str(exc)}"}, status=status.HTTP_502_BAD_GATEWAY)
+        except Exception as exc:
+            return Response({"error": str(exc)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 class AssistantSearchLogAPIView(APIView):

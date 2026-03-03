@@ -46,6 +46,7 @@ class NotionIntegrationConfig(AppConfig):
             "migrate",
             "collectstatic",
             "test",
+            "check",
             "shell",
             "createsuperuser",
         }

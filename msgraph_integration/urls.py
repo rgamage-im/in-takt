@@ -30,6 +30,7 @@ from .api_views import (
     GlobalSearchAPIView,
     TeamsSearchAPIView,
     EmailSearchAPIView,
+    NotionRAGSearchAPIView,
     AssistantChatAPIView,
     AssistantSearchLogAPIView,
     ExpenseReceiptsAPIView,
@@ -93,6 +94,7 @@ urlpatterns = [
     path('api/search/global/', GlobalSearchAPIView.as_view(), name='api-global-search'),
     path('api/search/teams/', TeamsSearchAPIView.as_view(), name='api-teams-search'),
     path('api/search/email/', EmailSearchAPIView.as_view(), name='api-email-search'),
+    path('api/search/notion/', NotionRAGSearchAPIView.as_view(), name='api-notion-rag-search'),
     path('api/assistant/chat/', AssistantChatAPIView.as_view(), name='api-assistant-chat'),
     path('api/assistant/search-log/', AssistantSearchLogAPIView.as_view(), name='api-assistant-search-log'),
     

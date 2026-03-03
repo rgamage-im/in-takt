@@ -99,6 +99,7 @@ class CompanyAssistantService:
         sharepoint_data: Optional[dict],
         teams_data: Optional[dict],
         email_data: Optional[dict],
+        notion_data: Optional[dict],
     ) -> tuple[str, list[dict]]:
         """
         Convert raw search results into:
@@ -152,6 +153,13 @@ class CompanyAssistantService:
                     date = resource.get("receivedDateTime", "")
                     snippet = summary or f"Email from {sender}"
 
+                elif source_type == "notion":
+                    metadata = hit.get("metadata", {}) or {}
+                    title = metadata.get("title") or "Notion content"
+                    url = metadata.get("source") or ""
+                    date = metadata.get("last_edited_time", "")
+                    snippet = hit.get("content", "").strip() or summary or "Notion document match"
+
                 else:
                     continue
 
@@ -176,6 +184,8 @@ class CompanyAssistantService:
             add_hits(self.flatten_hits(teams_data), "teams")
         if email_data:
             add_hits(self.flatten_hits(email_data), "email")
+        if notion_data:
+            add_hits(notion_data.get("results", []), "notion")
 
         context_text = "\n".join(context_lines)
         return context_text, sources
@@ -248,6 +258,7 @@ class CompanyAssistantService:
         sharepoint_data: Optional[dict] = None,
         teams_data: Optional[dict] = None,
         email_data: Optional[dict] = None,
+        notion_data: Optional[dict] = None,
         conversation_history: Optional[list] = None,
     ) -> dict:
         """
@@ -258,6 +269,7 @@ class CompanyAssistantService:
             sharepoint_data:      Raw result from /api/search/global/
             teams_data:           Raw result from /api/search/teams/
             email_data:           Raw result from /api/search/email/
+            notion_data:          Raw result from /api/search/notion/ (RAG)
             conversation_history: List of prior {role, content} dicts for multi-turn
 
         Returns:
@@ -268,7 +280,7 @@ class CompanyAssistantService:
             }
         """
         context_text, sources = self.build_context_from_results(
-            sharepoint_data, teams_data, email_data
+            sharepoint_data, teams_data, email_data, notion_data
         )
 
         answer = self.synthesize_answer(question, context_text, conversation_history)

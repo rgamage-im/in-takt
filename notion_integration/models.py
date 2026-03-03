@@ -17,6 +17,9 @@ class NotionContent(models.Model):
     is_archived = models.BooleanField(default=False)
     plain_text = models.TextField(blank=True, default="")
     raw_metadata = models.JSONField(default=dict, blank=True)
+    content_hash = models.CharField(max_length=64, blank=True, default="")
+    rag_document_id = models.CharField(max_length=64, blank=True, default="")
+    last_ingested_at = models.DateTimeField(null=True, blank=True)
     synced_at = models.DateTimeField(auto_now=True)
 
     class Meta:

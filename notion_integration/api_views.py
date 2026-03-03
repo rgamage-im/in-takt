@@ -5,6 +5,8 @@ from datetime import datetime, timezone
 import logging
 import time
 import uuid
+import hashlib
+import requests
 
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
@@ -13,9 +15,13 @@ from rest_framework.views import APIView
 from drf_spectacular.utils import OpenApiParameter, extend_schema
 from drf_spectacular.types import OpenApiTypes
 from django.utils.dateparse import parse_datetime
+from django.conf import settings
+from django.utils import timezone as django_timezone
 
 from .models import NotionContent
 from .services import NotionService
+
+RAG_API_TIMEOUT = 90
 
 
 class NotionSearchAPIView(APIView):
@@ -442,3 +448,180 @@ class NotionSyncAPIView(APIView):
         if not value:
             return None
         return parse_datetime(value)
+
+
+class NotionIngestToRAGAPIView(APIView):
+    """
+    Ingest locally synced Notion content rows into RAG pipeline.
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(
+        summary="Ingest synced Notion DB content into RAG",
+        parameters=[
+            OpenApiParameter(
+                name="max_items",
+                type=OpenApiTypes.INT,
+                location=OpenApiParameter.QUERY,
+                description="Optional cap for items processed in this run",
+            ),
+            OpenApiParameter(
+                name="only_changed",
+                type=OpenApiTypes.BOOL,
+                location=OpenApiParameter.QUERY,
+                description="Only ingest rows with changed content hash (default true)",
+            ),
+        ],
+        responses={200: dict, 500: dict},
+        tags=["Notion"],
+    )
+    def post(self, request):
+        max_items_raw = request.query_params.get("max_items")
+        max_items = int(max_items_raw) if max_items_raw else None
+        only_changed = request.query_params.get("only_changed", "true").lower() != "false"
+
+        run_id = str(uuid.uuid4())
+        started = time.monotonic()
+        logger = logging.getLogger(__name__)
+
+        queryset = (
+            NotionContent.objects
+            .filter(is_archived=False)
+            .exclude(plain_text="")
+            .order_by("-last_edited_time", "id")
+        )
+        if max_items is not None:
+            queryset = queryset[:max_items]
+
+        processed = 0
+        ingested = 0
+        skipped_unchanged = 0
+        failed = 0
+        failures = []
+
+        logger.info(
+            "notion_rag_ingest run_id=%s started max_items=%s only_changed=%s",
+            run_id,
+            max_items,
+            only_changed,
+        )
+
+        for row in queryset:
+            processed += 1
+            try:
+                row_hash = self._compute_content_hash(row)
+                if only_changed and row.rag_document_id and row.content_hash == row_hash:
+                    skipped_unchanged += 1
+                    continue
+
+                # Replace prior RAG document when refreshing this Notion row.
+                if row.rag_document_id:
+                    self._delete_rag_document(row.rag_document_id)
+
+                payload = {
+                    "content": row.plain_text,
+                    "metadata": {
+                        "source": row.url or f"notion:{row.notion_id}",
+                        "source_type": "notion",
+                        "title": row.title or row.notion_id,
+                        "file_type": "notion",
+                        "notion_id": row.notion_id,
+                        "notion_object_type": row.object_type,
+                        "notion_parent_type": row.parent_type,
+                        "notion_parent_id": row.parent_notion_id,
+                    },
+                }
+
+                # Match existing search ACL filtering behavior so ingested docs are retrievable.
+                acl = {}
+                if request.user.email:
+                    acl["allowed_users"] = [request.user.email]
+
+                try:
+                    social = request.user.social_auth.filter(provider="azuread-tenant-oauth2").first()
+                    if social and social.extra_data:
+                        user_groups = social.extra_data.get("groups", [])
+                        if user_groups:
+                            acl["allowed_groups"] = user_groups
+                except Exception:
+                    pass
+
+                if acl:
+                    payload["acl"] = acl
+
+                response = requests.post(
+                    f"{settings.RAG_API_BASE_URL}/api/v1/ingest/document",
+                    headers={
+                        "X-API-Key": settings.RAG_API_KEY,
+                        "Content-Type": "application/json",
+                    },
+                    json=payload,
+                    timeout=RAG_API_TIMEOUT,
+                )
+                response.raise_for_status()
+                result = response.json()
+
+                row.rag_document_id = result.get("document_id", row.rag_document_id)
+                row.content_hash = row_hash
+                row.last_ingested_at = django_timezone.now()
+                row.save(update_fields=["rag_document_id", "content_hash", "last_ingested_at", "synced_at"])
+                ingested += 1
+            except Exception as exc:
+                failed += 1
+                failures.append({"notion_id": row.notion_id, "error": str(exc)})
+                logger.warning(
+                    "notion_rag_ingest run_id=%s notion_id=%s error=%s",
+                    run_id,
+                    row.notion_id,
+                    str(exc),
+                )
+
+        duration = round(time.monotonic() - started, 3)
+        logger.info(
+            "notion_rag_ingest run_id=%s finished duration=%s processed=%s ingested=%s failed=%s skipped_unchanged=%s",
+            run_id,
+            duration,
+            processed,
+            ingested,
+            failed,
+            skipped_unchanged,
+        )
+
+        return Response(
+            {
+                "success": True,
+                "run_id": run_id,
+                "duration_seconds": duration,
+                "processed": processed,
+                "ingested": ingested,
+                "skipped_unchanged": skipped_unchanged,
+                "failed": failed,
+                "failures": failures[:25],
+            },
+            status=status.HTTP_200_OK,
+        )
+
+    @staticmethod
+    def _compute_content_hash(row: NotionContent) -> str:
+        hash_input = "||".join(
+            [
+                row.notion_id or "",
+                row.object_type or "",
+                row.title or "",
+                row.url or "",
+                row.plain_text or "",
+            ]
+        )
+        return hashlib.sha256(hash_input.encode("utf-8")).hexdigest()
+
+    @staticmethod
+    def _delete_rag_document(document_id: str) -> None:
+        response = requests.delete(
+            f"{settings.RAG_API_BASE_URL}/api/v1/ingest/document/{document_id}",
+            headers={"X-API-Key": settings.RAG_API_KEY},
+            timeout=RAG_API_TIMEOUT,
+        )
+        # Ignore not found; it means the old id was already gone.
+        if response.status_code != 404:
+            response.raise_for_status()

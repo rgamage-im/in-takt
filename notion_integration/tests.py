@@ -5,6 +5,7 @@ from django.test import TestCase, SimpleTestCase
 from rest_framework.test import APIClient
 from django.urls import reverse
 import requests
+from django.utils import timezone
 
 from .models import NotionContent
 from .services import NotionService
@@ -61,6 +62,11 @@ class NotionAPITestCase(TestCase):
         response = self.client.post(url)
         self.assertEqual(response.status_code, 403)
 
+    def test_ingest_rag_requires_authentication(self):
+        url = reverse("notion:api-ingest-rag")
+        response = self.client.post(url)
+        self.assertEqual(response.status_code, 403)
+
     @mock.patch("notion_integration.api_views.NotionService")
     def test_sync_ingests_page_and_database(self, notion_service_cls):
         notion = notion_service_cls.return_value
@@ -110,6 +116,63 @@ class NotionAPITestCase(TestCase):
         self.assertTrue(payload["success"])
         self.assertEqual(payload["processed"], 2)
         self.assertEqual(NotionContent.objects.count(), 2)
+
+    @mock.patch("notion_integration.api_views.requests.post")
+    def test_ingest_rag_ingests_new_row(self, post_mock):
+        NotionContent.objects.create(
+            notion_id="page-1",
+            object_type="page",
+            title="Policies",
+            url="https://www.notion.so/page-1",
+            plain_text="Policy text",
+            raw_metadata={},
+            last_edited_time=timezone.now(),
+        )
+
+        post_response = mock.MagicMock()
+        post_response.raise_for_status.return_value = None
+        post_response.json.return_value = {"document_id": "doc-123", "chunks_indexed": 2}
+        post_mock.return_value = post_response
+
+        self.client.force_authenticate(self.user)
+        url = reverse("notion:api-ingest-rag")
+        response = self.client.post(url)
+
+        self.assertEqual(response.status_code, 200)
+        body = response.json()
+        self.assertTrue(body["success"])
+        self.assertEqual(body["ingested"], 1)
+
+        row = NotionContent.objects.get(notion_id="page-1")
+        self.assertEqual(row.rag_document_id, "doc-123")
+        self.assertTrue(bool(row.content_hash))
+        self.assertIsNotNone(row.last_ingested_at)
+
+    @mock.patch("notion_integration.api_views.requests.post")
+    def test_ingest_rag_skips_unchanged_row(self, post_mock):
+        row = NotionContent.objects.create(
+            notion_id="page-2",
+            object_type="page",
+            title="Handbook",
+            url="https://www.notion.so/page-2",
+            plain_text="Same text",
+            raw_metadata={},
+            rag_document_id="doc-existing",
+            last_edited_time=timezone.now(),
+        )
+        from notion_integration.api_views import NotionIngestToRAGAPIView
+        row.content_hash = NotionIngestToRAGAPIView._compute_content_hash(row)
+        row.save(update_fields=["content_hash"])
+
+        self.client.force_authenticate(self.user)
+        url = reverse("notion:api-ingest-rag")
+        response = self.client.post(url)
+
+        self.assertEqual(response.status_code, 200)
+        body = response.json()
+        self.assertEqual(body["ingested"], 0)
+        self.assertEqual(body["skipped_unchanged"], 1)
+        post_mock.assert_not_called()
 
 
 class NotionServiceRetryTestCase(SimpleTestCase):

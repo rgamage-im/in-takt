@@ -3,7 +3,13 @@ Notion Integration URLs
 """
 from django.urls import path
 
-from .api_views import NotionSearchAPIView, NotionPageContentAPIView, NotionPageDetailAPIView, NotionSyncAPIView
+from .api_views import (
+    NotionSearchAPIView,
+    NotionPageContentAPIView,
+    NotionPageDetailAPIView,
+    NotionSyncAPIView,
+    NotionIngestToRAGAPIView,
+)
 
 app_name = "notion"
 
@@ -12,4 +18,5 @@ urlpatterns = [
     path("api/pages/<str:page_id>/", NotionPageDetailAPIView.as_view(), name="api-page-detail"),
     path("api/pages/<str:page_id>/content/", NotionPageContentAPIView.as_view(), name="api-page-content"),
     path("api/sync/", NotionSyncAPIView.as_view(), name="api-sync"),
+    path("api/ingest-rag/", NotionIngestToRAGAPIView.as_view(), name="api-ingest-rag"),
 ]

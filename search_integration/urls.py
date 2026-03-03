@@ -12,4 +12,6 @@ urlpatterns = [
     path('ingest/upload/', views.ingest_document_upload, name='ingest_document_upload'),
     path('delete/', views.delete_document, name='delete_document'),
     path('delete-index/', views.delete_index, name='delete_index'),
+    path('initialize-index/', views.initialize_index, name='initialize_index'),
+    path('delete-notion-content/', views.delete_notion_content, name='delete_notion_content'),
 ]

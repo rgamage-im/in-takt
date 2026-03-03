@@ -5,6 +5,7 @@ from django.contrib.auth.decorators import login_required
 from django.conf import settings
 from django.views.decorators.http import require_http_methods
 from django.http import JsonResponse
+from notion_integration.models import NotionContent
 
 # RAG API timeout in seconds (search, ingest, and delete operations)
 RAG_API_TIMEOUT = 90
@@ -553,3 +554,77 @@ def delete_index(request):
         }
 
     return render(request, "search/delete_index_result_partial.html", context)
+
+
+@login_required
+@require_http_methods(["POST"])
+def initialize_index(request):
+    """HTMX endpoint to initialize (or re-initialize) the search index"""
+    headers = {"X-API-Key": settings.RAG_API_KEY}
+    url = f"{settings.RAG_API_BASE_URL}/api/v1/ingest/initialize"
+
+    try:
+        response = requests.post(url, headers=headers, timeout=RAG_API_TIMEOUT)
+        if response.status_code == 405:
+            response = requests.get(url, headers=headers, timeout=RAG_API_TIMEOUT)
+        response.raise_for_status()
+
+        try:
+            data = response.json()
+        except ValueError:
+            data = {}
+
+        context = {
+            "success": True,
+            "index_name": data.get("index_name"),
+            "message": data.get("message") or "Index initialization completed.",
+            "error": None,
+        }
+    except requests.exceptions.Timeout:
+        context = {
+            "error": "Initialize index request timed out.",
+            "success": False
+        }
+    except requests.exceptions.ConnectionError:
+        context = {
+            "error": "Cannot connect to RAG API. Please check if the service is running.",
+            "success": False
+        }
+    except requests.exceptions.HTTPError as e:
+        try:
+            error_detail = e.response.json().get("detail", str(e))
+        except Exception:
+            error_detail = str(e)
+        context = {
+            "error": f"Initialize index failed: {error_detail}",
+            "success": False
+        }
+    except Exception as e:
+        context = {
+            "error": f"Unexpected error: {str(e)}",
+            "success": False
+        }
+
+    return render(request, "search/initialize_index_result_partial.html", context)
+
+
+@login_required
+@require_http_methods(["POST"])
+def delete_notion_content(request):
+    """HTMX endpoint to delete all locally synced Notion content rows"""
+    try:
+        total_before = NotionContent.objects.count()
+        deleted, _ = NotionContent.objects.all().delete()
+        context = {
+            "success": True,
+            "rows_before": total_before,
+            "rows_deleted": deleted,
+            "error": None,
+        }
+    except Exception as e:
+        context = {
+            "error": f"Delete Notion content failed: {str(e)}",
+            "success": False
+        }
+
+    return render(request, "search/delete_notion_content_result_partial.html", context)

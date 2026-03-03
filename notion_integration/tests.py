@@ -7,7 +7,7 @@ from django.urls import reverse
 import requests
 from django.utils import timezone
 
-from .models import NotionContent
+from .models import NotionContent, NotionSyncJob
 from .services import NotionService
 
 
@@ -60,6 +60,17 @@ class NotionAPITestCase(TestCase):
     def test_sync_requires_authentication(self):
         url = reverse("notion:api-sync")
         response = self.client.post(url)
+        self.assertEqual(response.status_code, 403)
+
+    def test_sync_async_requires_authentication(self):
+        url = reverse("notion:api-sync-async")
+        response = self.client.post(url)
+        self.assertEqual(response.status_code, 403)
+
+    def test_sync_job_status_requires_authentication(self):
+        job = NotionSyncJob.objects.create(job_id="job-1")
+        url = reverse("notion:api-sync-job-status", args=[job.job_id])
+        response = self.client.get(url)
         self.assertEqual(response.status_code, 403)
 
     def test_ingest_rag_requires_authentication(self):
@@ -116,6 +127,51 @@ class NotionAPITestCase(TestCase):
         self.assertTrue(payload["success"])
         self.assertEqual(payload["processed"], 2)
         self.assertEqual(NotionContent.objects.count(), 2)
+
+    @mock.patch("notion_integration.api_views.threading.Thread")
+    def test_sync_async_creates_job(self, thread_mock):
+        self.client.force_authenticate(self.user)
+        url = reverse("notion:api-sync-async")
+        response = self.client.post(url, {"max_items": 3})
+
+        self.assertEqual(response.status_code, 202)
+        payload = response.json()
+        self.assertTrue(payload["success"])
+        self.assertIn("job_id", payload)
+        job = NotionSyncJob.objects.get(job_id=payload["job_id"])
+        self.assertEqual(job.status, NotionSyncJob.STATUS_QUEUED)
+        thread_mock.assert_called_once()
+
+    def test_sync_job_status_owner_can_view(self):
+        self.client.force_authenticate(self.user)
+        job = NotionSyncJob.objects.create(
+            job_id="job-owner-1",
+            created_by=self.user,
+            status=NotionSyncJob.STATUS_QUEUED,
+            parameters={"max_items": 2},
+            progress_log=[{"event": "sync_started"}],
+        )
+        url = reverse("notion:api-sync-job-status", args=[job.job_id])
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["job_id"], "job-owner-1")
+        self.assertEqual(payload["status"], NotionSyncJob.STATUS_QUEUED)
+
+    def test_sync_job_status_other_user_cannot_view(self):
+        other = get_user_model().objects.create_user(
+            username="other", email="other@example.com", password="password"
+        )
+        job = NotionSyncJob.objects.create(
+            job_id="job-other-1",
+            created_by=other,
+            status=NotionSyncJob.STATUS_QUEUED,
+        )
+        self.client.force_authenticate(self.user)
+        url = reverse("notion:api-sync-job-status", args=[job.job_id])
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 404)
 
     @mock.patch("notion_integration.api_views.requests.post")
     def test_ingest_rag_ingests_new_row(self, post_mock):

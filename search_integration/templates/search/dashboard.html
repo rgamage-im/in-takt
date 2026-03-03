@@ -333,6 +333,10 @@
                     <input id="notion-ingest-only-changed" type="checkbox" checked>
                     Ingest Only Changed
                 </label>
+                <label class="inline-flex items-center gap-2 text-sm" style="color: var(--color-deep-navy);">
+                    <input id="notion-skip-sync-fetch" type="checkbox">
+                    Skip Notion Crawl (DB ingest only)
+                </label>
             </div>
 
             <div class="flex items-center gap-3 mb-4">
@@ -650,6 +654,7 @@ async function startNotionSyncJob() {
         params.set('recursive', document.getElementById('notion-recursive').checked ? 'true' : 'false');
         params.set('auto_ingest', document.getElementById('notion-auto-ingest').checked ? 'true' : 'false');
         params.set('ingest_only_changed', document.getElementById('notion-ingest-only-changed').checked ? 'true' : 'false');
+        params.set('skip_sync_fetch', document.getElementById('notion-skip-sync-fetch').checked ? 'true' : 'false');
 
         const response = await fetch(`/notion/api/sync/async/?${params.toString()}`, {
             method: 'POST',

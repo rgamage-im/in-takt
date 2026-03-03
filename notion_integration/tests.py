@@ -161,6 +161,19 @@ class NotionAPITestCase(TestCase):
         self.assertTrue(job.parameters.get("auto_ingest"))
         thread_mock.assert_called_once()
 
+    @mock.patch("notion_integration.api_views.threading.Thread")
+    def test_sync_async_supports_skip_sync_fetch(self, thread_mock):
+        self.client.force_authenticate(self.user)
+        url = reverse("notion:api-sync-async")
+        response = self.client.post(f"{url}?skip_sync_fetch=true")
+
+        self.assertEqual(response.status_code, 202)
+        payload = response.json()
+        self.assertTrue(payload["success"])
+        job = NotionSyncJob.objects.get(job_id=payload["job_id"])
+        self.assertTrue(job.parameters.get("skip_sync_fetch"))
+        thread_mock.assert_called_once()
+
     def test_sync_job_status_owner_can_view(self):
         self.client.force_authenticate(self.user)
         job = NotionSyncJob.objects.create(
@@ -277,6 +290,45 @@ class NotionAPITestCase(TestCase):
         job.refresh_from_db()
         self.assertEqual(job.status, NotionSyncJob.STATUS_CANCELED)
         self.assertTrue(job.result.get("canceled"))
+        self.assertIsNotNone(job.finished_at)
+
+    @mock.patch("notion_integration.api_views._run_notion_rag_ingest")
+    @mock.patch("notion_integration.api_views._run_notion_sync")
+    def test_worker_skip_sync_fetch_runs_ingest_only(self, sync_mock, ingest_mock):
+        job = NotionSyncJob.objects.create(
+            job_id="job-worker-skip-sync-1",
+            created_by=self.user,
+            status=NotionSyncJob.STATUS_QUEUED,
+            parameters={
+                "skip_sync_fetch": True,
+                "auto_ingest": True,
+                "ingest_only_changed": True,
+                "ingest_max_items": None,
+                "include_database_rows": True,
+                "recursive": True,
+                "max_blocks_per_page": 5000,
+                "max_depth": 20,
+            },
+            progress_log=[],
+            result={},
+        )
+        ingest_mock.return_value = {
+            "success": True,
+            "processed": 1,
+            "ingested": 1,
+            "failed": 0,
+            "failures": [],
+            "skipped_unchanged": 0,
+        }
+
+        _run_sync_job_worker(job.job_id)
+
+        job.refresh_from_db()
+        sync_mock.assert_not_called()
+        ingest_mock.assert_called_once()
+        self.assertEqual(job.status, NotionSyncJob.STATUS_SUCCEEDED)
+        self.assertTrue(job.result.get("sync_fetch_skipped"))
+        self.assertIn("ingest_result", job.result)
         self.assertIsNotNone(job.finished_at)
 
     def test_reconcile_stale_sync_jobs_marks_running_and_queued_failed(self):

@@ -781,7 +781,27 @@ def _run_sync_job_worker(job_id: str) -> None:
         )
         params_for_log = {k: v for k, v in params.items() if not k.startswith("_") and not callable(v)}
         record("sync_started", **params_for_log, user=user_label)
-        result = _run_notion_sync(params, user_label, record)
+        if params.get("skip_sync_fetch", False):
+            record("sync_fetch_skipped")
+            result = {
+                "success": True,
+                "canceled": False,
+                "duration_seconds": 0.0,
+                "processed": 0,
+                "created": 0,
+                "updated": 0,
+                "errors_count": 0,
+                "errors": [],
+                "total_discovered": 0,
+                "include_database_rows": params.get("include_database_rows", True),
+                "recursive": params.get("recursive", True),
+                "max_blocks_per_page": params.get("max_blocks_per_page", 5000),
+                "max_depth": params.get("max_depth", 20),
+                "user": user_label,
+                "sync_fetch_skipped": True,
+            }
+        else:
+            result = _run_notion_sync(params, user_label, record)
         if result.get("canceled") or is_hard_canceled():
             job.status = NotionSyncJob.STATUS_CANCELED
             job.result = result
@@ -892,6 +912,12 @@ class NotionSyncAsyncAPIView(APIView):
                 location=OpenApiParameter.QUERY,
                 description="When auto_ingest=true, optional cap for ingestion items",
             ),
+            OpenApiParameter(
+                name="skip_sync_fetch",
+                type=OpenApiTypes.BOOL,
+                location=OpenApiParameter.QUERY,
+                description="Skip Notion crawl/fetch and run only DB->RAG ingestion (default false)",
+            ),
         ],
         responses={202: dict, 500: dict},
         tags=["Notion"],
@@ -901,6 +927,7 @@ class NotionSyncAsyncAPIView(APIView):
         params.pop("debug", None)
         params["auto_ingest"] = request.query_params.get("auto_ingest", "true").lower() != "false"
         params["ingest_only_changed"] = request.query_params.get("ingest_only_changed", "true").lower() != "false"
+        params["skip_sync_fetch"] = request.query_params.get("skip_sync_fetch", "false").lower() == "true"
         ingest_max_items_raw = request.query_params.get("ingest_max_items")
         params["ingest_max_items"] = int(ingest_max_items_raw) if ingest_max_items_raw else None
         job_id = str(uuid.uuid4())

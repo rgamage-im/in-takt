@@ -287,6 +287,94 @@
         </div>
     </div>
 
+    <!-- Notion Sync Section -->
+    <div class="mb-8">
+        <h2 class="text-xl font-semibold mb-4" style="color: var(--color-deep-navy);">
+            Notion Sync Pipeline
+        </h2>
+        <div class="bg-white rounded-lg shadow p-6">
+            <p class="text-sm mb-4" style="color: var(--color-olive-gray);">
+                Run Notion sync in the background, then automatically ingest synced records into the RAG index.
+            </p>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                <div>
+                    <label for="notion-max-items" class="block text-sm font-medium mb-1" style="color: var(--color-deep-navy);">Max Items</label>
+                    <input id="notion-max-items" type="number" value="50" min="1" class="w-full px-3 py-2 border border-gray-300 rounded-md">
+                </div>
+                <div>
+                    <label for="notion-max-blocks" class="block text-sm font-medium mb-1" style="color: var(--color-deep-navy);">Max Blocks Per Page</label>
+                    <input id="notion-max-blocks" type="number" value="5000" min="1" class="w-full px-3 py-2 border border-gray-300 rounded-md">
+                </div>
+                <div>
+                    <label for="notion-max-depth" class="block text-sm font-medium mb-1" style="color: var(--color-deep-navy);">Max Depth</label>
+                    <input id="notion-max-depth" type="number" value="20" min="0" class="w-full px-3 py-2 border border-gray-300 rounded-md">
+                </div>
+                <div>
+                    <label for="notion-ingest-max-items" class="block text-sm font-medium mb-1" style="color: var(--color-deep-navy);">Ingest Max Items (optional)</label>
+                    <input id="notion-ingest-max-items" type="number" min="1" placeholder="All eligible" class="w-full px-3 py-2 border border-gray-300 rounded-md">
+                </div>
+            </div>
+
+            <div class="flex flex-wrap gap-6 mb-4">
+                <label class="inline-flex items-center gap-2 text-sm" style="color: var(--color-deep-navy);">
+                    <input id="notion-include-db-rows" type="checkbox" checked>
+                    Include Database Rows
+                </label>
+                <label class="inline-flex items-center gap-2 text-sm" style="color: var(--color-deep-navy);">
+                    <input id="notion-recursive" type="checkbox" checked>
+                    Recursive Page Crawl
+                </label>
+                <label class="inline-flex items-center gap-2 text-sm" style="color: var(--color-deep-navy);">
+                    <input id="notion-auto-ingest" type="checkbox" checked>
+                    Auto Ingest to RAG
+                </label>
+                <label class="inline-flex items-center gap-2 text-sm" style="color: var(--color-deep-navy);">
+                    <input id="notion-ingest-only-changed" type="checkbox" checked>
+                    Ingest Only Changed
+                </label>
+            </div>
+
+            <div class="flex items-center gap-3 mb-4">
+                <button id="start-notion-sync-btn" type="button" class="px-6 py-2 rounded-md text-white font-medium hover:opacity-90 transition-opacity" style="background-color: var(--color-warm-brick);">
+                    Start Notion Sync
+                </button>
+                <button id="cancel-notion-sync-btn" type="button" class="px-6 py-2 rounded-md text-white font-medium hover:opacity-90 transition-opacity hidden bg-gray-600">
+                    Cancel Sync
+                </button>
+                <span id="notion-sync-inline-status" class="text-sm" style="color: var(--color-olive-gray);"></span>
+            </div>
+
+            <div id="notion-sync-status-panel" class="hidden border border-gray-200 rounded-md p-4 bg-gray-50">
+                <p class="text-sm font-medium mb-2" style="color: var(--color-deep-navy);">Job Status</p>
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+                    <div><strong>Job:</strong> <span id="notion-job-id">—</span></div>
+                    <div><strong>Status:</strong> <span id="notion-job-status">—</span></div>
+                    <div><strong>Discovered:</strong> <span id="notion-discovered">—</span></div>
+                    <div><strong>Processed:</strong> <span id="notion-processed">—</span></div>
+                    <div><strong>Started:</strong> <span id="notion-started">—</span></div>
+                    <div><strong>Finished:</strong> <span id="notion-finished">—</span></div>
+                    <div><strong>Created:</strong> <span id="notion-created">—</span></div>
+                    <div><strong>Updated:</strong> <span id="notion-updated">—</span></div>
+                    <div><strong>Ingested:</strong> <span id="notion-ingested">—</span></div>
+                    <div><strong>Errors:</strong> <span id="notion-errors">—</span></div>
+                </div>
+                <p class="text-xs mt-3" style="color: var(--color-olive-gray);">
+                    Last event: <span id="notion-last-event">—</span>
+                </p>
+            </div>
+
+            <div id="notion-last-sync-panel" class="hidden border border-gray-200 rounded-md p-4 bg-gray-50 mt-4">
+                <p class="text-sm font-medium mb-2" style="color: var(--color-deep-navy);">Last Sync</p>
+                <p class="text-sm" style="color: var(--color-olive-gray);">
+                    Job <span id="notion-last-job-id">—</span> finished with status
+                    <strong id="notion-last-status">—</strong>.
+                    <a id="notion-last-admin-link" href="#" class="underline ml-2" style="color: var(--color-warm-brick);">View in Admin</a>
+                </p>
+            </div>
+        </div>
+    </div>
+
     <!-- Information Section -->
     <div class="bg-blue-50 border-l-4 border-blue-400 p-4 rounded">
         <div class="flex">
@@ -319,5 +407,275 @@ function updateWeightLabel(value) {
         label.textContent = `Hybrid (${weight.toFixed(1)})`;
     }
 }
+
+function getCsrfToken() {
+    const cookie = document.cookie.split('; ').find(row => row.startsWith('csrftoken='));
+    return cookie ? decodeURIComponent(cookie.split('=')[1]) : '';
+}
+
+let notionPollInterval = null;
+let notionCurrentJobId = null;
+const NOTION_SYNC_JOB_STORAGE_KEY = 'notion_sync_job_id';
+
+function notionSetInlineStatus(text) {
+    const el = document.getElementById('notion-sync-inline-status');
+    if (el) el.textContent = text;
+}
+
+function notionShowCancelButton(show, disabled = false, label = 'Cancel Sync') {
+    const btn = document.getElementById('cancel-notion-sync-btn');
+    if (!btn) return;
+    if (show) {
+        btn.classList.remove('hidden');
+    } else {
+        btn.classList.add('hidden');
+    }
+    btn.disabled = disabled;
+    btn.textContent = label;
+}
+
+function notionUpdateStatusPanel(jobPayload) {
+    const panel = document.getElementById('notion-sync-status-panel');
+    panel.classList.remove('hidden');
+
+    const jobId = jobPayload.job_id || '—';
+    const status = jobPayload.status || 'unknown';
+    const progressTail = jobPayload.progress_tail || [];
+    const result = jobPayload.result || {};
+    const lastEvent = progressTail.length ? progressTail[progressTail.length - 1] : null;
+
+    const discoveredEvent = progressTail.find(e => e.event === 'search_discovery_complete');
+    const latestItemFinished = [...progressTail].reverse().find(e => e.event === 'item_finished');
+    const latestItemStarted = [...progressTail].reverse().find(e => e.event === 'item_started');
+    const latestItemStage = [...progressTail].reverse().find(e => e.event === 'item_stage');
+    const startedCount = progressTail.filter(e => e.event === 'item_started').length;
+    const finishedCount = progressTail.filter(e => e.event === 'item_finished').length;
+    const failedCount = progressTail.filter(e => e.event === 'item_failed').length;
+    const ingestResult = result.ingest_result || {};
+
+    document.getElementById('notion-job-id').textContent = jobId;
+    document.getElementById('notion-job-status').textContent = status;
+    document.getElementById('notion-discovered').textContent = discoveredEvent ? (discoveredEvent.discovered_total ?? '—') : (result.total_discovered ?? '—');
+    document.getElementById('notion-processed').textContent = result.processed ?? finishedCount ?? latestItemFinished?.processed ?? '—';
+    document.getElementById('notion-started').textContent = startedCount;
+    document.getElementById('notion-finished').textContent = finishedCount;
+    document.getElementById('notion-created').textContent = result.created ?? '—';
+    document.getElementById('notion-updated').textContent = result.updated ?? '—';
+    document.getElementById('notion-ingested').textContent = ingestResult.ingested ?? '—';
+    document.getElementById('notion-errors').textContent = (result.errors_count ?? failedCount ?? 0) + (ingestResult.failed ?? 0);
+
+    let lastEventLabel = '—';
+    if (lastEvent) {
+        lastEventLabel = lastEvent.event;
+        if (lastEvent.event === 'item_stage') {
+            const nid = lastEvent.notion_id || latestItemStarted?.notion_id || 'unknown';
+            const stage = lastEvent.stage || 'unknown';
+            lastEventLabel = `item_stage (${stage}) for ${nid}`;
+        } else if (lastEvent.event === 'item_started' || lastEvent.event === 'item_finished' || lastEvent.event === 'item_failed') {
+            const nid = lastEvent.notion_id || 'unknown';
+            lastEventLabel = `${lastEvent.event} for ${nid}`;
+        }
+    } else if (latestItemStage) {
+        lastEventLabel = `item_stage (${latestItemStage.stage || 'unknown'}) for ${latestItemStage.notion_id || 'unknown'}`;
+    }
+    document.getElementById('notion-last-event').textContent = lastEventLabel;
+
+    if (status === 'queued' || status === 'running') {
+        if (jobPayload.cancel_requested) {
+            notionShowCancelButton(true, true, 'Cancel Requested');
+        } else {
+            notionShowCancelButton(true, false, 'Cancel Sync');
+        }
+    } else {
+        notionShowCancelButton(false);
+    }
+}
+
+async function notionPollJob(jobId) {
+    notionCurrentJobId = jobId;
+    try { localStorage.setItem(NOTION_SYNC_JOB_STORAGE_KEY, jobId); } catch (e) {}
+    if (notionPollInterval) clearInterval(notionPollInterval);
+
+    const pollOnce = async () => {
+        try {
+            const response = await fetch(`/notion/api/sync/jobs/${encodeURIComponent(jobId)}/`);
+            if (!response.ok) {
+                if (response.status === 404) {
+                    try { localStorage.removeItem(NOTION_SYNC_JOB_STORAGE_KEY); } catch (e) {}
+                }
+                throw new Error(`Polling failed: ${response.status}`);
+            }
+            const payload = await response.json();
+            notionUpdateStatusPanel(payload);
+
+            if (payload.status === 'succeeded') {
+                notionSetInlineStatus('Notion sync and ingestion completed.');
+                clearInterval(notionPollInterval);
+                notionPollInterval = null;
+                notionCurrentJobId = null;
+                notionShowCancelButton(false);
+                try { localStorage.removeItem(NOTION_SYNC_JOB_STORAGE_KEY); } catch (e) {}
+                await notionShowLastSyncIfAny();
+            } else if (payload.status === 'canceled') {
+                notionSetInlineStatus('Notion sync canceled.');
+                clearInterval(notionPollInterval);
+                notionPollInterval = null;
+                notionCurrentJobId = null;
+                notionShowCancelButton(false);
+                try { localStorage.removeItem(NOTION_SYNC_JOB_STORAGE_KEY); } catch (e) {}
+                await notionShowLastSyncIfAny();
+            } else if (payload.status === 'failed') {
+                notionSetInlineStatus(`Notion sync failed: ${payload.error || 'unknown error'}`);
+                clearInterval(notionPollInterval);
+                notionPollInterval = null;
+                notionCurrentJobId = null;
+                notionShowCancelButton(false);
+                try { localStorage.removeItem(NOTION_SYNC_JOB_STORAGE_KEY); } catch (e) {}
+                await notionShowLastSyncIfAny();
+            } else {
+                notionSetInlineStatus(payload.cancel_requested ? `Notion sync ${payload.status} (cancel requested)...` : `Notion sync ${payload.status}...`);
+            }
+        } catch (err) {
+            notionSetInlineStatus(`Polling error: ${err.message}`);
+        }
+    };
+
+    await pollOnce();
+    notionPollInterval = setInterval(pollOnce, 3000);
+}
+
+async function notionResumeActiveJobIfAny() {
+    let restoredFromStorage = false;
+    try {
+        const storedJobId = localStorage.getItem(NOTION_SYNC_JOB_STORAGE_KEY);
+        if (storedJobId) {
+            restoredFromStorage = true;
+            notionSetInlineStatus(`Resumed Notion sync job ${storedJobId} from browser state.`);
+            await notionPollJob(storedJobId);
+            return;
+        }
+    } catch (err) {
+        console.warn('Unable to read notion sync local storage', err);
+    }
+
+    try {
+        const response = await fetch('/notion/api/sync/jobs/active/');
+        if (!response.ok) return;
+        const payload = await response.json();
+        if (payload.has_active_job && payload.job && payload.job.job_id) {
+            document.getElementById('notion-last-sync-panel').classList.add('hidden');
+            notionSetInlineStatus('Resumed active Notion sync job.');
+            await notionPollJob(payload.job.job_id);
+        } else if (!restoredFromStorage) {
+            notionSetInlineStatus('');
+            notionShowCancelButton(false);
+            await notionShowLastSyncIfAny();
+        }
+    } catch (err) {
+        console.warn('Notion active job lookup failed', err);
+        notionShowCancelButton(false);
+    }
+}
+
+async function notionShowLastSyncIfAny() {
+    try {
+        const response = await fetch('/notion/api/sync/jobs/latest/');
+        if (!response.ok) return;
+        const payload = await response.json();
+        const panel = document.getElementById('notion-last-sync-panel');
+        if (!payload.has_job || !payload.job) {
+            panel.classList.add('hidden');
+            return;
+        }
+        const job = payload.job;
+        if (job.status === 'queued' || job.status === 'running') {
+            panel.classList.add('hidden');
+            return;
+        }
+        document.getElementById('notion-last-job-id').textContent = job.job_id || '—';
+        document.getElementById('notion-last-status').textContent = job.status || '—';
+        const link = document.getElementById('notion-last-admin-link');
+        link.href = job.admin_url || '#';
+        panel.classList.remove('hidden');
+    } catch (err) {
+        console.warn('Notion latest job lookup failed', err);
+    }
+}
+
+async function startNotionSyncJob() {
+    const button = document.getElementById('start-notion-sync-btn');
+    button.disabled = true;
+    notionSetInlineStatus('Starting Notion sync job...');
+    document.getElementById('notion-last-sync-panel').classList.add('hidden');
+    notionShowCancelButton(false);
+
+    try {
+        const params = new URLSearchParams();
+        const maxItems = document.getElementById('notion-max-items').value.trim();
+        const maxBlocks = document.getElementById('notion-max-blocks').value.trim();
+        const maxDepth = document.getElementById('notion-max-depth').value.trim();
+        const ingestMaxItems = document.getElementById('notion-ingest-max-items').value.trim();
+
+        if (maxItems) params.set('max_items', maxItems);
+        if (maxBlocks) params.set('max_blocks_per_page', maxBlocks);
+        if (maxDepth) params.set('max_depth', maxDepth);
+        if (ingestMaxItems) params.set('ingest_max_items', ingestMaxItems);
+
+        params.set('include_database_rows', document.getElementById('notion-include-db-rows').checked ? 'true' : 'false');
+        params.set('recursive', document.getElementById('notion-recursive').checked ? 'true' : 'false');
+        params.set('auto_ingest', document.getElementById('notion-auto-ingest').checked ? 'true' : 'false');
+        params.set('ingest_only_changed', document.getElementById('notion-ingest-only-changed').checked ? 'true' : 'false');
+
+        const response = await fetch(`/notion/api/sync/async/?${params.toString()}`, {
+            method: 'POST',
+            headers: { 'X-CSRFToken': getCsrfToken() }
+        });
+        const payload = await response.json();
+        if (!response.ok || !payload.success) {
+            throw new Error(payload.error || `Failed to start sync (${response.status})`);
+        }
+
+        notionSetInlineStatus(`Started Notion sync job ${payload.job_id}`);
+        await notionPollJob(payload.job_id);
+    } catch (err) {
+        notionSetInlineStatus(`Start failed: ${err.message}`);
+    } finally {
+        button.disabled = false;
+    }
+}
+
+async function cancelNotionSyncJob() {
+    const jobId = notionCurrentJobId;
+    if (!jobId) {
+        notionSetInlineStatus('No active sync job to cancel.');
+        return;
+    }
+    notionShowCancelButton(true, true, 'Cancel Requested');
+    notionSetInlineStatus(`Requesting cancel for job ${jobId}...`);
+
+    try {
+        const response = await fetch(`/notion/api/sync/jobs/${encodeURIComponent(jobId)}/cancel/`, {
+            method: 'POST',
+            headers: { 'X-CSRFToken': getCsrfToken() }
+        });
+        const payload = await response.json();
+        if (!response.ok || !payload.success) {
+            throw new Error(payload.error || payload.message || `Cancel failed (${response.status})`);
+        }
+        notionSetInlineStatus(`Cancel requested for job ${jobId}.`);
+        await notionPollJob(jobId);
+    } catch (err) {
+        notionShowCancelButton(true, false, 'Cancel Sync');
+        notionSetInlineStatus(`Cancel request failed: ${err.message}`);
+    }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    const btn = document.getElementById('start-notion-sync-btn');
+    if (btn) btn.addEventListener('click', startNotionSyncJob);
+    const cancelBtn = document.getElementById('cancel-notion-sync-btn');
+    if (cancelBtn) cancelBtn.addEventListener('click', cancelNotionSyncJob);
+    notionResumeActiveJobIfAny();
+});
 </script>
 {% endblock %}

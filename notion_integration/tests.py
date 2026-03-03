@@ -9,6 +9,7 @@ from django.utils import timezone
 
 from .models import NotionContent, NotionSyncJob
 from .services import NotionService
+from .api_views import _run_sync_job_worker
 
 
 class NotionAPITestCase(TestCase):
@@ -71,6 +72,22 @@ class NotionAPITestCase(TestCase):
         job = NotionSyncJob.objects.create(job_id="job-1")
         url = reverse("notion:api-sync-job-status", args=[job.job_id])
         response = self.client.get(url)
+        self.assertEqual(response.status_code, 403)
+
+    def test_sync_active_job_requires_authentication(self):
+        url = reverse("notion:api-sync-jobs-active")
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 403)
+
+    def test_sync_latest_job_requires_authentication(self):
+        url = reverse("notion:api-sync-jobs-latest")
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 403)
+
+    def test_sync_job_cancel_requires_authentication(self):
+        job = NotionSyncJob.objects.create(job_id="job-cancel-auth")
+        url = reverse("notion:api-sync-job-cancel", args=[job.job_id])
+        response = self.client.post(url)
         self.assertEqual(response.status_code, 403)
 
     def test_ingest_rag_requires_authentication(self):
@@ -140,6 +157,7 @@ class NotionAPITestCase(TestCase):
         self.assertIn("job_id", payload)
         job = NotionSyncJob.objects.get(job_id=payload["job_id"])
         self.assertEqual(job.status, NotionSyncJob.STATUS_QUEUED)
+        self.assertTrue(job.parameters.get("auto_ingest"))
         thread_mock.assert_called_once()
 
     def test_sync_job_status_owner_can_view(self):
@@ -172,6 +190,115 @@ class NotionAPITestCase(TestCase):
         url = reverse("notion:api-sync-job-status", args=[job.job_id])
         response = self.client.get(url)
         self.assertEqual(response.status_code, 404)
+
+    def test_sync_job_cancel_owner_can_cancel_running(self):
+        self.client.force_authenticate(self.user)
+        job = NotionSyncJob.objects.create(
+            job_id="job-cancel-running-1",
+            created_by=self.user,
+            status=NotionSyncJob.STATUS_RUNNING,
+        )
+        url = reverse("notion:api-sync-job-cancel", args=[job.job_id])
+        response = self.client.post(url)
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertTrue(payload["success"])
+        job.refresh_from_db()
+        self.assertTrue(job.cancel_requested)
+        self.assertEqual(job.status, NotionSyncJob.STATUS_CANCELED)
+        self.assertIsNotNone(job.finished_at)
+        self.assertIsNotNone(job.cancel_requested_at)
+
+    def test_sync_job_cancel_owner_cancels_queued_immediately(self):
+        self.client.force_authenticate(self.user)
+        job = NotionSyncJob.objects.create(
+            job_id="job-cancel-queued-1",
+            created_by=self.user,
+            status=NotionSyncJob.STATUS_QUEUED,
+        )
+        url = reverse("notion:api-sync-job-cancel", args=[job.job_id])
+        response = self.client.post(url)
+
+        self.assertEqual(response.status_code, 200)
+        job.refresh_from_db()
+        self.assertTrue(job.cancel_requested)
+        self.assertEqual(job.status, NotionSyncJob.STATUS_CANCELED)
+        self.assertIsNotNone(job.finished_at)
+
+    def test_sync_job_cancel_other_user_cannot_cancel(self):
+        other = get_user_model().objects.create_user(
+            username="other2", email="other2@example.com", password="password"
+        )
+        job = NotionSyncJob.objects.create(
+            job_id="job-cancel-other-1",
+            created_by=other,
+            status=NotionSyncJob.STATUS_RUNNING,
+        )
+        self.client.force_authenticate(self.user)
+        url = reverse("notion:api-sync-job-cancel", args=[job.job_id])
+        response = self.client.post(url)
+        self.assertEqual(response.status_code, 404)
+
+    def test_sync_job_cancel_terminal_job_returns_conflict(self):
+        self.client.force_authenticate(self.user)
+        job = NotionSyncJob.objects.create(
+            job_id="job-cancel-terminal-1",
+            created_by=self.user,
+            status=NotionSyncJob.STATUS_SUCCEEDED,
+        )
+        url = reverse("notion:api-sync-job-cancel", args=[job.job_id])
+        response = self.client.post(url)
+        self.assertEqual(response.status_code, 409)
+
+    @mock.patch("notion_integration.api_views._run_notion_sync")
+    def test_worker_marks_canceled_when_sync_result_canceled(self, sync_mock):
+        job = NotionSyncJob.objects.create(
+            job_id="job-worker-canceled-1",
+            created_by=self.user,
+            status=NotionSyncJob.STATUS_QUEUED,
+            parameters={},
+            progress_log=[],
+            result={},
+        )
+        sync_mock.return_value = {
+            "success": False,
+            "canceled": True,
+            "processed": 0,
+            "created": 0,
+            "updated": 0,
+            "errors_count": 0,
+            "errors": [],
+        }
+
+        _run_sync_job_worker(job.job_id)
+
+        job.refresh_from_db()
+        self.assertEqual(job.status, NotionSyncJob.STATUS_CANCELED)
+        self.assertTrue(job.result.get("canceled"))
+        self.assertIsNotNone(job.finished_at)
+
+    def test_sync_active_job_returns_latest_for_user(self):
+        self.client.force_authenticate(self.user)
+        NotionSyncJob.objects.create(job_id="job-a", created_by=self.user, status=NotionSyncJob.STATUS_RUNNING)
+        newest = NotionSyncJob.objects.create(job_id="job-b", created_by=self.user, status=NotionSyncJob.STATUS_QUEUED)
+        url = reverse("notion:api-sync-jobs-active")
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+        body = response.json()
+        self.assertTrue(body["has_active_job"])
+        self.assertEqual(body["job"]["job_id"], newest.job_id)
+
+    def test_sync_latest_job_returns_latest_for_user(self):
+        self.client.force_authenticate(self.user)
+        NotionSyncJob.objects.create(job_id="job-c", created_by=self.user, status=NotionSyncJob.STATUS_FAILED)
+        newest = NotionSyncJob.objects.create(job_id="job-d", created_by=self.user, status=NotionSyncJob.STATUS_SUCCEEDED)
+        url = reverse("notion:api-sync-jobs-latest")
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+        body = response.json()
+        self.assertTrue(body["has_job"])
+        self.assertEqual(body["job"]["job_id"], newest.job_id)
 
     @mock.patch("notion_integration.api_views.requests.post")
     def test_ingest_rag_ingests_new_row(self, post_mock):
@@ -216,8 +343,8 @@ class NotionAPITestCase(TestCase):
             rag_document_id="doc-existing",
             last_edited_time=timezone.now(),
         )
-        from notion_integration.api_views import NotionIngestToRAGAPIView
-        row.content_hash = NotionIngestToRAGAPIView._compute_content_hash(row)
+        from notion_integration.api_views import _compute_notion_content_hash
+        row.content_hash = _compute_notion_content_hash(row)
         row.save(update_fields=["content_hash"])
 
         self.client.force_authenticate(self.user)
@@ -276,6 +403,24 @@ class NotionServiceRetryTestCase(SimpleTestCase):
         self.assertEqual(request_mock.call_count, 2)
         sleep_mock.assert_called_once_with(0.0)
 
+    @mock.patch.dict("os.environ", {"NOTION_INTERNAL_TOKEN": "test-token", "NOTION_API_MAX_RETRIES": "2"})
+    @mock.patch("notion_integration.services.time.sleep")
+    @mock.patch("notion_integration.services.requests.request")
+    def test_request_retries_on_timeout_then_succeeds(self, request_mock, sleep_mock):
+        success_response = mock.MagicMock()
+        success_response.status_code = 200
+        success_response.headers = {}
+        success_response.json.return_value = {"ok": True}
+
+        request_mock.side_effect = [requests.exceptions.Timeout("read timed out"), success_response]
+
+        notion = NotionService()
+        payload = notion._request("GET", "/test")
+
+        self.assertEqual(payload, {"ok": True})
+        self.assertEqual(request_mock.call_count, 2)
+        sleep_mock.assert_called_once_with(1.0)
+
 
 class NotionServiceExtractionTestCase(SimpleTestCase):
     def test_extract_text_preserves_external_urls_and_captions(self):
@@ -317,3 +462,23 @@ class NotionServiceExtractionTestCase(SimpleTestCase):
         self.assertIn("[image URL] https://images.example.com/diagram.png", text)
         self.assertIn("[image Caption] System diagram", text)
         self.assertIn("[bookmark URL] https://integralmethods.sharepoint.com/sites/wiki", text)
+
+    def test_extract_text_handles_null_rich_text_payloads(self):
+        service = object.__new__(NotionService)
+        blocks = [
+            {
+                "id": "b-null",
+                "type": "paragraph",
+                "paragraph": {
+                    "rich_text": [
+                        {"type": "text", "plain_text": "ok", "text": None},
+                        {"type": "text", "plain_text": "", "text": {"content": "fallback", "link": None}},
+                        {"type": "text", "plain_text": "", "text": None},
+                    ]
+                },
+            }
+        ]
+
+        text = service._extract_text_from_blocks(blocks)
+        self.assertIn("ok", text)
+        self.assertIn("fallback", text)

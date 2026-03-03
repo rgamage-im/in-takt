@@ -35,11 +35,13 @@ class NotionSyncJob(models.Model):
     STATUS_RUNNING = "running"
     STATUS_SUCCEEDED = "succeeded"
     STATUS_FAILED = "failed"
+    STATUS_CANCELED = "canceled"
     STATUS_CHOICES = (
         (STATUS_QUEUED, "Queued"),
         (STATUS_RUNNING, "Running"),
         (STATUS_SUCCEEDED, "Succeeded"),
         (STATUS_FAILED, "Failed"),
+        (STATUS_CANCELED, "Canceled"),
     )
 
     job_id = models.CharField(max_length=64, unique=True)
@@ -49,6 +51,8 @@ class NotionSyncJob(models.Model):
     progress_log = models.JSONField(default=list, blank=True)
     result = models.JSONField(default=dict, blank=True)
     error_message = models.TextField(blank=True, default="")
+    cancel_requested = models.BooleanField(default=False)
+    cancel_requested_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     started_at = models.DateTimeField(null=True, blank=True)
     finished_at = models.DateTimeField(null=True, blank=True)

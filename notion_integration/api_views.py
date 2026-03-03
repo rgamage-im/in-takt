@@ -21,9 +21,13 @@ from django.utils import timezone as django_timezone
 from django.db import close_old_connections
 
 from .models import NotionContent, NotionSyncJob
-from .services import NotionService
+from .services import NotionService, NotionSyncCancelled
 
 RAG_API_TIMEOUT = 90
+
+
+class SyncCancelled(Exception):
+    """Raised when a sync job cancellation has been requested."""
 
 
 def _property_to_text(prop: dict) -> str:
@@ -65,14 +69,18 @@ def _property_to_text(prop: dict) -> str:
     return ""
 
 
-def _get_database_rows_text(notion: NotionService, database_id: str) -> str:
+def _get_database_rows_text(notion: NotionService, database_id: str, should_cancel=None) -> str:
     lines = []
     cursor = None
 
     while True:
+        if callable(should_cancel) and should_cancel():
+            raise SyncCancelled("Cancellation requested while reading database rows.")
         response = notion.query_database(database_id=database_id, page_size=100, start_cursor=cursor)
         rows = response.get("results", [])
         for row in rows:
+            if callable(should_cancel) and should_cancel():
+                raise SyncCancelled("Cancellation requested while processing database rows.")
             row_title = notion.extract_title(row)
             properties = row.get("properties", {})
             property_parts = []
@@ -124,24 +132,96 @@ def _parse_sync_params(request) -> dict:
 def _run_notion_sync(params: dict, user_label: str, record) -> dict:
     started = time.monotonic()
     notion = NotionService()
-
-    page_results = list(notion.iterate_search_results(query="", filter_type="page"))
-    database_results = list(notion.iterate_search_results(query="", filter_type="database"))
-    combined = page_results + database_results
-    record(
-        "search_discovery_complete",
-        discovered_pages=len(page_results),
-        discovered_databases=len(database_results),
-        discovered_total=len(combined),
-    )
-
     processed = 0
     created = 0
     updated = 0
     errors = []
     seen_ids = set()
+    canceled = False
+    should_cancel = params.get("_should_cancel")
+
+    page_results = []
+    database_results = []
+    combined = []
+
+    def ensure_not_canceled():
+        if callable(should_cancel) and should_cancel():
+            raise SyncCancelled("Cancellation requested.")
+
+    try:
+        for item in notion.iterate_search_results(query="", filter_type="page", should_cancel=should_cancel):
+            ensure_not_canceled()
+            page_results.append(item)
+            combined.append(item)
+            if len(page_results) % 25 == 0:
+                record(
+                    "search_discovery_progress",
+                    discovered_pages=len(page_results),
+                    discovered_databases=len(database_results),
+                    discovered_total=len(combined),
+                )
+        for item in notion.iterate_search_results(query="", filter_type="database", should_cancel=should_cancel):
+            ensure_not_canceled()
+            database_results.append(item)
+            combined.append(item)
+            if len(database_results) % 10 == 0:
+                record(
+                    "search_discovery_progress",
+                    discovered_pages=len(page_results),
+                    discovered_databases=len(database_results),
+                    discovered_total=len(combined),
+                )
+        record(
+            "search_discovery_complete",
+            discovered_pages=len(page_results),
+            discovered_databases=len(database_results),
+            discovered_total=len(combined),
+        )
+    except (SyncCancelled, NotionSyncCancelled):
+        canceled = True
+        record(
+            "sync_canceled",
+            processed=processed,
+            created=created,
+            updated=updated,
+            errors_count=len(errors),
+            stage="discovery",
+            discovered_pages=len(page_results),
+            discovered_databases=len(database_results),
+            discovered_total=len(combined),
+        )
+        duration = round(time.monotonic() - started, 3)
+        return {
+            "success": False,
+            "canceled": True,
+            "duration_seconds": duration,
+            "processed": processed,
+            "created": created,
+            "updated": updated,
+            "errors_count": len(errors),
+            "errors": errors[:25],
+            "total_discovered": len(combined),
+            "include_database_rows": params["include_database_rows"],
+            "recursive": params["recursive"],
+            "max_blocks_per_page": params["max_blocks_per_page"],
+            "max_depth": params["max_depth"],
+            "user": user_label,
+        }
 
     for item in combined:
+        try:
+            ensure_not_canceled()
+        except (SyncCancelled, NotionSyncCancelled):
+            canceled = True
+            record(
+                "sync_canceled",
+                processed=processed,
+                created=created,
+                updated=updated,
+                errors_count=len(errors),
+            )
+            break
+
         notion_id = item.get("id")
         if not notion_id or notion_id in seen_ids:
             continue
@@ -157,6 +237,7 @@ def _run_notion_sync(params: dict, user_label: str, record) -> dict:
         try:
             item_started = time.monotonic()
             record("item_started", notion_id=notion_id, object_type=object_type)
+            ensure_not_canceled()
             if object_type == "page":
                 record("item_stage", notion_id=notion_id, object_type=object_type, stage="fetch_page_content")
                 page_payload = notion.get_page_content(
@@ -164,16 +245,21 @@ def _run_notion_sync(params: dict, user_label: str, record) -> dict:
                     recursive=params["recursive"],
                     max_blocks=params["max_blocks_per_page"],
                     max_depth=params["max_depth"],
+                    should_cancel=should_cancel,
                 )
+                ensure_not_canceled()
                 metadata = page_payload.get("metadata", {})
                 plain_text = page_payload.get("text_content", "")
             else:
                 record("item_stage", notion_id=notion_id, object_type=object_type, stage="fetch_database")
                 metadata = notion.retrieve_database(notion_id)
+                ensure_not_canceled()
                 plain_text = ""
                 if params["include_database_rows"]:
                     record("item_stage", notion_id=notion_id, object_type=object_type, stage="fetch_database_rows")
-                    plain_text = _get_database_rows_text(notion, notion_id)
+                    plain_text = _get_database_rows_text(notion, notion_id, should_cancel=should_cancel)
+
+            ensure_not_canceled()
 
             title = notion.extract_title(metadata) or notion.extract_title(item)
             parent_type, parent_notion_id = notion.extract_parent_info(metadata)
@@ -207,6 +293,17 @@ def _run_notion_sync(params: dict, user_label: str, record) -> dict:
                 text_chars=len(plain_text),
                 processed=processed,
             )
+        except SyncCancelled:
+            canceled = True
+            record(
+                "sync_canceled",
+                processed=processed,
+                created=created,
+                updated=updated,
+                errors_count=len(errors),
+                during_notion_id=notion_id,
+            )
+            break
         except Exception as exc:
             record("item_failed", notion_id=notion_id, object_type=object_type, error=str(exc))
             errors.append({"id": notion_id, "object": object_type, "error": str(exc)})
@@ -221,7 +318,8 @@ def _run_notion_sync(params: dict, user_label: str, record) -> dict:
         errors_count=len(errors),
     )
     return {
-        "success": True,
+        "success": not canceled,
+        "canceled": canceled,
         "duration_seconds": duration,
         "processed": processed,
         "created": created,
@@ -234,6 +332,165 @@ def _run_notion_sync(params: dict, user_label: str, record) -> dict:
         "max_blocks_per_page": params["max_blocks_per_page"],
         "max_depth": params["max_depth"],
         "user": user_label,
+    }
+
+
+def _build_user_acl(user) -> dict:
+    acl = {}
+    if getattr(user, "email", None):
+        acl["allowed_users"] = [user.email]
+
+    try:
+        social = user.social_auth.filter(provider="azuread-tenant-oauth2").first()
+        if social and social.extra_data:
+            user_groups = social.extra_data.get("groups", [])
+            if user_groups:
+                acl["allowed_groups"] = user_groups
+    except Exception:
+        pass
+    return acl
+
+
+def _compute_notion_content_hash(row: NotionContent) -> str:
+    hash_input = "||".join(
+        [
+            row.notion_id or "",
+            row.object_type or "",
+            row.title or "",
+            row.url or "",
+            row.plain_text or "",
+        ]
+    )
+    return hashlib.sha256(hash_input.encode("utf-8")).hexdigest()
+
+
+def _delete_rag_document(document_id: str) -> None:
+    response = requests.delete(
+        f"{settings.RAG_API_BASE_URL}/api/v1/ingest/document/{document_id}",
+        headers={"X-API-Key": settings.RAG_API_KEY},
+        timeout=RAG_API_TIMEOUT,
+    )
+    if response.status_code != 404:
+        response.raise_for_status()
+
+
+def _run_notion_rag_ingest(max_items: int | None, only_changed: bool, user, logger=None) -> dict:
+    if logger is None:
+        logger = logging.getLogger(__name__)
+
+    run_id = str(uuid.uuid4())
+    started = time.monotonic()
+    queryset = (
+        NotionContent.objects
+        .filter(is_archived=False)
+        .exclude(plain_text="")
+        .order_by("-last_edited_time", "id")
+    )
+    if max_items is not None:
+        queryset = queryset[:max_items]
+
+    processed = 0
+    ingested = 0
+    skipped_unchanged = 0
+    failed = 0
+    failures = []
+    acl = _build_user_acl(user)
+
+    logger.info(
+        "notion_rag_ingest run_id=%s started max_items=%s only_changed=%s user=%s",
+        run_id,
+        max_items,
+        only_changed,
+        getattr(user, "email", getattr(user, "username", "unknown")),
+    )
+
+    for row in queryset:
+        processed += 1
+        try:
+            row_hash = _compute_notion_content_hash(row)
+            if only_changed and row.rag_document_id and row.content_hash == row_hash:
+                skipped_unchanged += 1
+                continue
+
+            if row.rag_document_id:
+                _delete_rag_document(row.rag_document_id)
+
+            payload = {
+                "content": row.plain_text,
+                "metadata": {
+                    "source": row.url or f"notion:{row.notion_id}",
+                    "source_type": "notion",
+                    "title": row.title or row.notion_id,
+                    "file_type": "notion",
+                    "notion_id": row.notion_id,
+                    "notion_object_type": row.object_type,
+                    "notion_parent_type": row.parent_type,
+                    "notion_parent_id": row.parent_notion_id,
+                },
+            }
+            if acl:
+                payload["acl"] = acl
+
+            response = requests.post(
+                f"{settings.RAG_API_BASE_URL}/api/v1/ingest/document",
+                headers={
+                    "X-API-Key": settings.RAG_API_KEY,
+                    "Content-Type": "application/json",
+                },
+                json=payload,
+                timeout=RAG_API_TIMEOUT,
+            )
+            response.raise_for_status()
+            result = response.json()
+
+            row.rag_document_id = result.get("document_id", row.rag_document_id)
+            row.content_hash = row_hash
+            row.last_ingested_at = django_timezone.now()
+            row.save(update_fields=["rag_document_id", "content_hash", "last_ingested_at", "synced_at"])
+            ingested += 1
+        except Exception as exc:
+            failed += 1
+            failures.append({"notion_id": row.notion_id, "error": str(exc)})
+            logger.warning("notion_rag_ingest run_id=%s notion_id=%s error=%s", run_id, row.notion_id, str(exc))
+
+    duration = round(time.monotonic() - started, 3)
+    result = {
+        "success": True,
+        "run_id": run_id,
+        "duration_seconds": duration,
+        "processed": processed,
+        "ingested": ingested,
+        "skipped_unchanged": skipped_unchanged,
+        "failed": failed,
+        "failures": failures[:25],
+    }
+    logger.info(
+        "notion_rag_ingest run_id=%s finished duration=%s processed=%s ingested=%s failed=%s skipped_unchanged=%s",
+        run_id,
+        duration,
+        processed,
+        ingested,
+        failed,
+        skipped_unchanged,
+    )
+    return result
+
+
+def _serialize_sync_job(job: NotionSyncJob) -> dict:
+    return {
+        "id": job.id,
+        "job_id": job.job_id,
+        "status": job.status,
+        "cancel_requested": job.cancel_requested,
+        "cancel_requested_at": job.cancel_requested_at,
+        "created_at": job.created_at,
+        "started_at": job.started_at,
+        "finished_at": job.finished_at,
+        "parameters": job.parameters,
+        "progress_tail": (job.progress_log or [])[-50:],
+        "result": job.result or {},
+        "error": job.error_message or None,
+        "admin_url": f"/admin/notion_integration/notionsyncjob/{job.id}/change/",
     }
 
 
@@ -475,6 +732,18 @@ def _run_sync_job_worker(job_id: str) -> None:
         logger.warning("notion_sync_job missing job_id=%s", job_id)
         return
 
+    if job.status == NotionSyncJob.STATUS_CANCELED:
+        close_old_connections()
+        return
+
+    if job.cancel_requested:
+        job.status = NotionSyncJob.STATUS_CANCELED
+        job.finished_at = django_timezone.now()
+        job.error_message = ""
+        job.save(update_fields=["status", "finished_at", "error_message"])
+        close_old_connections()
+        return
+
     job.status = NotionSyncJob.STATUS_RUNNING
     job.started_at = django_timezone.now()
     job.save(update_fields=["status", "started_at"])
@@ -495,20 +764,67 @@ def _run_sync_job_worker(job_id: str) -> None:
         job.save(update_fields=["progress_log"])
         logger.info("notion_sync_async job_id=%s event=%s details=%s", job_id, event, fields)
 
+    def is_hard_canceled() -> bool:
+        latest = NotionSyncJob.objects.only("status", "cancel_requested").get(pk=job.pk)
+        return latest.status == NotionSyncJob.STATUS_CANCELED or bool(latest.cancel_requested)
+
     try:
         params = dict(job.parameters or {})
+
+        def should_cancel() -> bool:
+            latest = NotionSyncJob.objects.only("cancel_requested").get(pk=job.pk)
+            return bool(latest.cancel_requested)
+
+        params["_should_cancel"] = should_cancel
         user_label = job.created_by.email if job.created_by and job.created_by.email else (
             job.created_by.username if job.created_by else "system"
         )
-        record("sync_started", **params, user=user_label)
+        params_for_log = {k: v for k, v in params.items() if not k.startswith("_") and not callable(v)}
+        record("sync_started", **params_for_log, user=user_label)
         result = _run_notion_sync(params, user_label, record)
+        if result.get("canceled") or is_hard_canceled():
+            job.status = NotionSyncJob.STATUS_CANCELED
+            job.result = result
+            job.finished_at = django_timezone.now()
+            job.error_message = ""
+            job.save(update_fields=["status", "result", "finished_at", "error_message"])
+            return
+
+        if params.get("auto_ingest", False) and job.created_by and not is_hard_canceled():
+            record(
+                "rag_ingest_started",
+                max_items=params.get("ingest_max_items"),
+                only_changed=params.get("ingest_only_changed", True),
+            )
+            ingest_result = _run_notion_rag_ingest(
+                max_items=params.get("ingest_max_items"),
+                only_changed=params.get("ingest_only_changed", True),
+                user=job.created_by,
+                logger=logger,
+            )
+            result["ingest_result"] = ingest_result
+            record(
+                "rag_ingest_finished",
+                ingested=ingest_result.get("ingested", 0),
+                failed=ingest_result.get("failed", 0),
+                processed=ingest_result.get("processed", 0),
+            )
         result["job_id"] = job_id
-        job.status = NotionSyncJob.STATUS_SUCCEEDED
+        if is_hard_canceled():
+            job.status = NotionSyncJob.STATUS_CANCELED
+        else:
+            job.status = NotionSyncJob.STATUS_SUCCEEDED
         job.result = result
         job.finished_at = django_timezone.now()
         job.error_message = ""
         job.save(update_fields=["status", "result", "finished_at", "error_message"])
     except Exception as exc:
+        if is_hard_canceled():
+            job.status = NotionSyncJob.STATUS_CANCELED
+            job.finished_at = django_timezone.now()
+            job.error_message = ""
+            job.save(update_fields=["status", "finished_at", "error_message"])
+            return
         record("sync_failed", error=str(exc))
         job.status = NotionSyncJob.STATUS_FAILED
         job.error_message = str(exc)
@@ -558,6 +874,24 @@ class NotionSyncAsyncAPIView(APIView):
                 location=OpenApiParameter.QUERY,
                 description="Safety cap for nested block depth when recursive=true (default 20)",
             ),
+            OpenApiParameter(
+                name="auto_ingest",
+                type=OpenApiTypes.BOOL,
+                location=OpenApiParameter.QUERY,
+                description="Automatically ingest synced records into RAG after sync (default true)",
+            ),
+            OpenApiParameter(
+                name="ingest_only_changed",
+                type=OpenApiTypes.BOOL,
+                location=OpenApiParameter.QUERY,
+                description="When auto_ingest=true, ingest only changed records (default true)",
+            ),
+            OpenApiParameter(
+                name="ingest_max_items",
+                type=OpenApiTypes.INT,
+                location=OpenApiParameter.QUERY,
+                description="When auto_ingest=true, optional cap for ingestion items",
+            ),
         ],
         responses={202: dict, 500: dict},
         tags=["Notion"],
@@ -565,6 +899,10 @@ class NotionSyncAsyncAPIView(APIView):
     def post(self, request):
         params = _parse_sync_params(request)
         params.pop("debug", None)
+        params["auto_ingest"] = request.query_params.get("auto_ingest", "true").lower() != "false"
+        params["ingest_only_changed"] = request.query_params.get("ingest_only_changed", "true").lower() != "false"
+        ingest_max_items_raw = request.query_params.get("ingest_max_items")
+        params["ingest_max_items"] = int(ingest_max_items_raw) if ingest_max_items_raw else None
         job_id = str(uuid.uuid4())
 
         job = NotionSyncJob.objects.create(
@@ -615,19 +953,115 @@ class NotionSyncJobStatusAPIView(APIView):
             return Response({"error": "Job not found"}, status=status.HTTP_404_NOT_FOUND)
 
         return Response(
+            _serialize_sync_job(job),
+            status=status.HTTP_200_OK,
+        )
+
+
+class NotionSyncJobCancelAPIView(APIView):
+    """
+    Request cancellation for an async Notion sync job.
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(
+        summary="Cancel async Notion sync job",
+        responses={200: dict, 404: dict, 409: dict},
+        tags=["Notion"],
+    )
+    def post(self, request, job_id: str):
+        try:
+            job = NotionSyncJob.objects.select_related("created_by").get(job_id=job_id)
+        except NotionSyncJob.DoesNotExist:
+            return Response({"error": "Job not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        if not request.user.is_staff and job.created_by_id != request.user.id:
+            return Response({"error": "Job not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        if job.status in [NotionSyncJob.STATUS_SUCCEEDED, NotionSyncJob.STATUS_FAILED, NotionSyncJob.STATUS_CANCELED]:
+            return Response(
+                {
+                    "success": False,
+                    "job_id": job.job_id,
+                    "status": job.status,
+                    "message": f"Cannot cancel a {job.status} job.",
+                },
+                status=status.HTTP_409_CONFLICT,
+            )
+
+        now = django_timezone.now()
+        job.cancel_requested = True
+        job.cancel_requested_at = now
+        job.status = NotionSyncJob.STATUS_CANCELED
+        job.finished_at = now
+        job.error_message = ""
+        job.save(
+            update_fields=[
+                "cancel_requested",
+                "cancel_requested_at",
+                "status",
+                "finished_at",
+                "error_message",
+            ]
+        )
+
+        return Response(
             {
+                "success": True,
                 "job_id": job.job_id,
                 "status": job.status,
-                "created_at": job.created_at,
-                "started_at": job.started_at,
-                "finished_at": job.finished_at,
-                "parameters": job.parameters,
-                "progress_tail": (job.progress_log or [])[-50:],
-                "result": job.result or {},
-                "error": job.error_message or None,
+                "cancel_requested": job.cancel_requested,
+                "cancel_requested_at": job.cancel_requested_at,
             },
             status=status.HTTP_200_OK,
         )
+
+
+class NotionSyncActiveJobAPIView(APIView):
+    """
+    Return newest active sync job for current user.
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(
+        summary="Get active async Notion sync job for current user",
+        responses={200: dict},
+        tags=["Notion"],
+    )
+    def get(self, request):
+        queryset = NotionSyncJob.objects.filter(status__in=[NotionSyncJob.STATUS_QUEUED, NotionSyncJob.STATUS_RUNNING])
+        if not request.user.is_staff:
+            queryset = queryset.filter(created_by=request.user)
+        job = queryset.order_by("-created_at").first()
+
+        if not job:
+            return Response({"has_active_job": False, "job": None}, status=status.HTTP_200_OK)
+        return Response({"has_active_job": True, "job": _serialize_sync_job(job)}, status=status.HTTP_200_OK)
+
+
+class NotionSyncLatestJobAPIView(APIView):
+    """
+    Return most recent sync job for current user scope.
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(
+        summary="Get latest Notion sync job",
+        responses={200: dict},
+        tags=["Notion"],
+    )
+    def get(self, request):
+        queryset = NotionSyncJob.objects.all()
+        if not request.user.is_staff:
+            queryset = queryset.filter(created_by=request.user)
+        job = queryset.order_by("-created_at").first()
+
+        if not job:
+            return Response({"has_job": False, "job": None}, status=status.HTTP_200_OK)
+        return Response({"has_job": True, "job": _serialize_sync_job(job)}, status=status.HTTP_200_OK)
 
 
 class NotionIngestToRAGAPIView(APIView):
@@ -660,148 +1094,10 @@ class NotionIngestToRAGAPIView(APIView):
         max_items_raw = request.query_params.get("max_items")
         max_items = int(max_items_raw) if max_items_raw else None
         only_changed = request.query_params.get("only_changed", "true").lower() != "false"
-
-        run_id = str(uuid.uuid4())
-        started = time.monotonic()
-        logger = logging.getLogger(__name__)
-
-        queryset = (
-            NotionContent.objects
-            .filter(is_archived=False)
-            .exclude(plain_text="")
-            .order_by("-last_edited_time", "id")
+        result = _run_notion_rag_ingest(
+            max_items=max_items,
+            only_changed=only_changed,
+            user=request.user,
+            logger=logging.getLogger(__name__),
         )
-        if max_items is not None:
-            queryset = queryset[:max_items]
-
-        processed = 0
-        ingested = 0
-        skipped_unchanged = 0
-        failed = 0
-        failures = []
-
-        logger.info(
-            "notion_rag_ingest run_id=%s started max_items=%s only_changed=%s",
-            run_id,
-            max_items,
-            only_changed,
-        )
-
-        for row in queryset:
-            processed += 1
-            try:
-                row_hash = self._compute_content_hash(row)
-                if only_changed and row.rag_document_id and row.content_hash == row_hash:
-                    skipped_unchanged += 1
-                    continue
-
-                # Replace prior RAG document when refreshing this Notion row.
-                if row.rag_document_id:
-                    self._delete_rag_document(row.rag_document_id)
-
-                payload = {
-                    "content": row.plain_text,
-                    "metadata": {
-                        "source": row.url or f"notion:{row.notion_id}",
-                        "source_type": "notion",
-                        "title": row.title or row.notion_id,
-                        "file_type": "notion",
-                        "notion_id": row.notion_id,
-                        "notion_object_type": row.object_type,
-                        "notion_parent_type": row.parent_type,
-                        "notion_parent_id": row.parent_notion_id,
-                    },
-                }
-
-                # Match existing search ACL filtering behavior so ingested docs are retrievable.
-                acl = {}
-                if request.user.email:
-                    acl["allowed_users"] = [request.user.email]
-
-                try:
-                    social = request.user.social_auth.filter(provider="azuread-tenant-oauth2").first()
-                    if social and social.extra_data:
-                        user_groups = social.extra_data.get("groups", [])
-                        if user_groups:
-                            acl["allowed_groups"] = user_groups
-                except Exception:
-                    pass
-
-                if acl:
-                    payload["acl"] = acl
-
-                response = requests.post(
-                    f"{settings.RAG_API_BASE_URL}/api/v1/ingest/document",
-                    headers={
-                        "X-API-Key": settings.RAG_API_KEY,
-                        "Content-Type": "application/json",
-                    },
-                    json=payload,
-                    timeout=RAG_API_TIMEOUT,
-                )
-                response.raise_for_status()
-                result = response.json()
-
-                row.rag_document_id = result.get("document_id", row.rag_document_id)
-                row.content_hash = row_hash
-                row.last_ingested_at = django_timezone.now()
-                row.save(update_fields=["rag_document_id", "content_hash", "last_ingested_at", "synced_at"])
-                ingested += 1
-            except Exception as exc:
-                failed += 1
-                failures.append({"notion_id": row.notion_id, "error": str(exc)})
-                logger.warning(
-                    "notion_rag_ingest run_id=%s notion_id=%s error=%s",
-                    run_id,
-                    row.notion_id,
-                    str(exc),
-                )
-
-        duration = round(time.monotonic() - started, 3)
-        logger.info(
-            "notion_rag_ingest run_id=%s finished duration=%s processed=%s ingested=%s failed=%s skipped_unchanged=%s",
-            run_id,
-            duration,
-            processed,
-            ingested,
-            failed,
-            skipped_unchanged,
-        )
-
-        return Response(
-            {
-                "success": True,
-                "run_id": run_id,
-                "duration_seconds": duration,
-                "processed": processed,
-                "ingested": ingested,
-                "skipped_unchanged": skipped_unchanged,
-                "failed": failed,
-                "failures": failures[:25],
-            },
-            status=status.HTTP_200_OK,
-        )
-
-    @staticmethod
-    def _compute_content_hash(row: NotionContent) -> str:
-        hash_input = "||".join(
-            [
-                row.notion_id or "",
-                row.object_type or "",
-                row.title or "",
-                row.url or "",
-                row.plain_text or "",
-            ]
-        )
-        return hashlib.sha256(hash_input.encode("utf-8")).hexdigest()
-
-    @staticmethod
-    def _delete_rag_document(document_id: str) -> None:
-        response = requests.delete(
-            f"{settings.RAG_API_BASE_URL}/api/v1/ingest/document/{document_id}",
-            headers={"X-API-Key": settings.RAG_API_KEY},
-            timeout=RAG_API_TIMEOUT,
-        )
-        # Ignore not found; it means the old id was already gone.
-        if response.status_code != 404:
-            response.raise_for_status()
+        return Response(result, status=status.HTTP_200_OK)

@@ -1,5 +1,6 @@
 from django.contrib import admin
 from django.utils.html import format_html
+from django.utils import timezone
 
 from .models import NotionContent, NotionSyncJob
 
@@ -93,14 +94,25 @@ class NotionContentAdmin(admin.ModelAdmin):
 
 @admin.register(NotionSyncJob)
 class NotionSyncJobAdmin(admin.ModelAdmin):
-    list_display = ("job_id", "status", "created_by", "created_at", "started_at", "finished_at")
+    list_display = (
+        "job_id",
+        "status",
+        "cancel_requested",
+        "created_by",
+        "created_at",
+        "started_at",
+        "finished_at",
+    )
     list_filter = ("status", "created_at", "started_at", "finished_at")
     search_fields = ("job_id", "created_by__username", "created_by__email", "error_message")
     ordering = ("-created_at",)
     list_per_page = 50
+    actions = ("request_cancel_action",)
     readonly_fields = (
         "job_id",
         "status",
+        "cancel_requested",
+        "cancel_requested_at",
         "created_by",
         "parameters",
         "progress_log",
@@ -113,6 +125,7 @@ class NotionSyncJobAdmin(admin.ModelAdmin):
 
     fieldsets = (
         ("Core", {"fields": ("job_id", "status", "created_by")}),
+        ("Cancellation", {"fields": ("cancel_requested", "cancel_requested_at")}),
         ("Timing", {"fields": ("created_at", "started_at", "finished_at")}),
         ("Parameters", {"fields": ("parameters",)}),
         ("Progress", {"fields": ("progress_log",), "classes": ("collapse",)}),
@@ -142,3 +155,25 @@ class NotionSyncJobAdmin(admin.ModelAdmin):
             "delete": False,
             "view": True,
         }
+
+    @admin.action(description="Request cancellation for selected queued/running jobs")
+    def request_cancel_action(self, request, queryset):
+        now = timezone.now()
+        active_queryset = queryset.filter(status__in=[NotionSyncJob.STATUS_QUEUED, NotionSyncJob.STATUS_RUNNING])
+
+        running_count = active_queryset.filter(status=NotionSyncJob.STATUS_RUNNING).update(
+            cancel_requested=True,
+            cancel_requested_at=now,
+            status=NotionSyncJob.STATUS_CANCELED,
+            finished_at=now,
+            error_message="",
+        )
+        queued_count = active_queryset.filter(status=NotionSyncJob.STATUS_QUEUED).update(
+            cancel_requested=True,
+            cancel_requested_at=now,
+            status=NotionSyncJob.STATUS_CANCELED,
+            finished_at=now,
+            error_message="",
+        )
+        total = running_count + queued_count
+        self.message_user(request, f"Cancellation requested for {total} job(s).")

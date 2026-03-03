@@ -9,6 +9,10 @@ from typing import Any, Dict, Generator, Optional
 import requests
 
 
+class NotionSyncCancelled(Exception):
+    """Raised when cooperative cancellation is requested for Notion sync work."""
+
+
 class NotionService:
     """
     Thin wrapper around the Notion REST API.
@@ -48,7 +52,24 @@ class NotionService:
         last_response = None
 
         for attempt in range(max_retries + 1):
-            response = requests.request(method, url, headers=self._headers, params=params, json=json, timeout=15)
+            try:
+                response = requests.request(method, url, headers=self._headers, params=params, json=json, timeout=15)
+            except (requests.exceptions.Timeout, requests.exceptions.ConnectionError) as exc:
+                if attempt < max_retries:
+                    backoff_seconds = min(base_delay_seconds * (2 ** attempt), max_delay_seconds)
+                    logger.warning(
+                        "notion_api_retry method=%s path=%s exception=%s attempt=%s/%s sleep_seconds=%s",
+                        method,
+                        path,
+                        exc.__class__.__name__,
+                        attempt + 1,
+                        max_retries + 1,
+                        backoff_seconds,
+                    )
+                    time.sleep(backoff_seconds)
+                    continue
+                raise
+
             last_response = response
 
             if response.status_code in retryable_status_codes and attempt < max_retries:
@@ -158,6 +179,7 @@ class NotionService:
         recursive: bool = True,
         max_blocks: int = 5000,
         max_depth: int = 20,
+        should_cancel=None,
     ) -> Dict[str, Any]:
         """
         Get full page content including metadata and all blocks.
@@ -174,8 +196,13 @@ class NotionService:
                 - blocks: List of all blocks with their content
                 - text_content: Plain text extracted from all blocks
         """
+        if callable(should_cancel) and should_cancel():
+            raise NotionSyncCancelled("Cancellation requested before page fetch.")
+
         # Get page metadata
         page_metadata = self.retrieve_page(page_id)
+        if callable(should_cancel) and should_cancel():
+            raise NotionSyncCancelled("Cancellation requested after metadata fetch.")
         
         # Get all blocks with recursion safety guards
         logger = logging.getLogger(__name__)
@@ -190,6 +217,7 @@ class NotionService:
             recursive=recursive,
             depth=0,
             state=state,
+            should_cancel=should_cancel,
         )
         logger.info(
             "notion_page_fetch page_id=%s recursive=%s blocks=%s max_blocks=%s max_depth=%s",
@@ -215,6 +243,7 @@ class NotionService:
         recursive: bool = True,
         depth: int = 0,
         state: Optional[Dict[str, Any]] = None,
+        should_cancel=None,
     ) -> list[Dict[str, Any]]:
         """
         Recursively fetch all blocks and their children.
@@ -222,6 +251,9 @@ class NotionService:
         all_blocks = []
         if state is None:
             state = {"count": 0, "max_blocks": 5000, "max_depth": 20, "visited_block_ids": set()}
+
+        if callable(should_cancel) and should_cancel():
+            raise NotionSyncCancelled("Cancellation requested while traversing blocks.")
 
         if block_id in state["visited_block_ids"]:
             return all_blocks
@@ -234,6 +266,8 @@ class NotionService:
         start_cursor = None
         
         while has_more:
+            if callable(should_cancel) and should_cancel():
+                raise NotionSyncCancelled("Cancellation requested while paginating blocks.")
             response = self.list_block_children(
                 block_id=block_id,
                 page_size=100,
@@ -255,6 +289,7 @@ class NotionService:
                         recursive=True,
                         depth=depth + 1,
                         state=state,
+                        should_cancel=should_cancel,
                     )
                     # Add children to the block
                     block["children"] = child_blocks
@@ -276,17 +311,29 @@ class NotionService:
             if not block_type:
                 continue
             
-            block_content = block.get(block_type, {})
+            block_content = block.get(block_type) or {}
+            if not isinstance(block_content, dict):
+                block_content = {}
             
             # Extract text from rich text arrays
             if "rich_text" in block_content:
                 for text_obj in block_content["rich_text"]:
-                    plain_text = text_obj.get("plain_text") or text_obj.get("text", {}).get("content", "")
+                    if not isinstance(text_obj, dict):
+                        continue
+
+                    text_payload = text_obj.get("text") or {}
+                    if not isinstance(text_payload, dict):
+                        text_payload = {}
+
+                    plain_text = text_obj.get("plain_text") or text_payload.get("content", "")
                     if plain_text:
                         text_parts.append(plain_text)
 
                     # Preserve inline links so downstream retrieval can cite external URLs.
-                    href = text_obj.get("href") or text_obj.get("text", {}).get("link", {}).get("url")
+                    link_payload = text_payload.get("link") or {}
+                    if not isinstance(link_payload, dict):
+                        link_payload = {}
+                    href = text_obj.get("href") or link_payload.get("url")
                     if href:
                         text_parts.append(f"[Link] {href}")
             
@@ -441,13 +488,18 @@ class NotionService:
         query: str = "",
         filter_type: Optional[str] = None,
         page_size: int = 100,
+        should_cancel=None,
     ) -> Generator[Dict[str, Any], None, None]:
         """
         Iterate all Notion search results using cursor pagination.
         """
+        logger = logging.getLogger(__name__)
         start_cursor: Optional[str] = None
+        seen_cursors: set[str] = set()
 
         while True:
+            if callable(should_cancel) and should_cancel():
+                raise NotionSyncCancelled("Cancellation requested during Notion search discovery.")
             response = self.search(
                 query=query,
                 page_size=page_size,
@@ -459,9 +511,18 @@ class NotionService:
 
             if not response.get("has_more"):
                 break
-            start_cursor = response.get("next_cursor")
-            if not start_cursor:
+            next_cursor = response.get("next_cursor")
+            if not next_cursor:
                 break
+            if next_cursor in seen_cursors:
+                logger.warning(
+                    "notion_search_cursor_loop_detected filter_type=%s cursor=%s; breaking pagination loop",
+                    filter_type,
+                    next_cursor,
+                )
+                break
+            seen_cursors.add(next_cursor)
+            start_cursor = next_cursor
 
     @staticmethod
     def extract_title(obj: Dict[str, Any]) -> str:

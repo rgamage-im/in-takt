@@ -24,7 +24,7 @@ from .models import CompanyAssistantSearchLog
 
 
 logger = logging.getLogger(__name__)
-RAG_API_TIMEOUT = 30
+RAG_API_TIMEOUT = 60
 
 
 def _resolve_account_identifier(request) -> str:
@@ -63,7 +63,7 @@ def _log_company_assistant_search(request, query: str, request_type: str) -> Non
         logger.exception("Failed to create CompanyAssistantSearchLog record.")
 
 
-def _search_notion_rag(query: str, user, top_k: int = 10, vector_weight: float = 0.5, use_reranking: bool = True) -> dict:
+def _search_notion_rag(query: str, user, top_k: int = 10, vector_weight: float = 0.5, use_reranking: bool = False) -> dict:
     """
     Query RAG API for Notion-backed indexed content.
     """
@@ -1427,7 +1427,7 @@ class AssistantChatAPIView(APIView):
                     user=getattr(request, "user", None),
                     top_k=10,
                     vector_weight=0.5,
-                    use_reranking=True,
+                    use_reranking=False,
                 )
                 if _notion_result_count(primary) > 0:
                     return primary
@@ -1442,7 +1442,7 @@ class AssistantChatAPIView(APIView):
                     user=getattr(request, "user", None),
                     top_k=10,
                     vector_weight=0.5,
-                    use_reranking=True,
+                    use_reranking=False,
                 )
                 return fallback
 
@@ -1567,7 +1567,7 @@ class NotionRAGSearchAPIView(APIView):
                 user=getattr(request, "user", None),
                 top_k=top_k,
                 vector_weight=0.5,
-                use_reranking=True,
+                use_reranking=False,
             )
             return Response(results, status=status.HTTP_200_OK)
         except requests.exceptions.RequestException as exc:

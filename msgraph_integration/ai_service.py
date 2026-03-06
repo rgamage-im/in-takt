@@ -164,15 +164,16 @@ class CompanyAssistantService:
                     continue
 
                 idx = len(sources) + 1
-                sources.append(
-                    {
-                        "index": idx,
-                        "title": title,
-                        "url": url,
-                        "type": source_type,
-                        "date": date[:10] if date else "",
-                    }
-                )
+                source_entry = {
+                    "index": idx,
+                    "title": title,
+                    "url": url,
+                    "type": source_type,
+                    "date": date[:10] if date else "",
+                }
+                if source_type == "notion" and snippet and snippet != "Notion document match":
+                    source_entry["snippet"] = snippet[:300].strip()
+                sources.append(source_entry)
 
                 context_lines.append(
                     f"[{idx}] ({source_type.upper()}) {title}\n{snippet}\n"

@@ -185,6 +185,7 @@
 
     .chat-source-item {
         display: flex;
+        flex-wrap: wrap;
         align-items: baseline;
         gap: 0.4rem;
         margin-bottom: 0.3rem;
@@ -237,6 +238,16 @@
     .chat-source-link:hover {
         color: var(--color-warm-brick);
         text-decoration: underline;
+    }
+
+    .chat-source-snippet {
+        flex-basis: 100%;
+        margin-top: 0.15rem;
+        padding-left: 1.9rem;
+        font-size: 0.75rem;
+        color: var(--color-olive-gray);
+        line-height: 1.45;
+        word-break: break-word;
     }
 
     .thinking-indicator {
@@ -777,6 +788,7 @@ document.addEventListener('DOMContentLoaded', function () {
                            title="${escapeHtml(s.title)}">
                             ${escapeHtml(s.title)}${s.date ? ' · ' + escapeHtml(s.date) : ''}
                         </a>
+                        ${s.snippet ? `<div class="chat-source-snippet">${escapeHtml(s.snippet)}</div>` : ''}
                     </div>
                 `).join('')}
                </div>`

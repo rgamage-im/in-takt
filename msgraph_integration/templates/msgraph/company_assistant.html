@@ -250,6 +250,25 @@
         word-break: break-word;
     }
 
+    .ai-query-option {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        margin-top: 0.5rem;
+        font-size: 0.8rem;
+        color: var(--color-olive-gray);
+    }
+
+    .ai-query-option input[type="checkbox"] {
+        flex-shrink: 0;
+        cursor: pointer;
+    }
+
+    .ai-query-option label {
+        cursor: pointer;
+        user-select: none;
+    }
+
     .thinking-indicator {
         display: flex;
         align-items: center;
@@ -464,6 +483,12 @@
             </div>
         </div>
 
+        <!-- AI Query Restatement option (chat mode only) -->
+        <div id="aiQueryOption" class="ai-query-option">
+            <input type="checkbox" id="useAiQuery" checked>
+            <label for="useAiQuery">Allow AI to re-state my question into a succinct query</label>
+        </div>
+
         <!-- Error Display -->
         <div id="errorDisplay" style="display: none;" class="error-message"></div>
 
@@ -609,6 +634,8 @@ document.addEventListener('DOMContentLoaded', function () {
     const sourceTeams       = document.getElementById('sourceTeams');
     const sourceEmail       = document.getElementById('sourceEmail');
     const sourceNotion      = document.getElementById('sourceNotion');
+    const useAiQuery        = document.getElementById('useAiQuery');
+    const aiQueryOption     = document.getElementById('aiQueryOption');
 
     // -------------------------------------------------------
     // Mode toggle
@@ -619,6 +646,7 @@ document.addEventListener('DOMContentLoaded', function () {
         document.getElementById('btnSearch').classList.toggle('active', mode === 'search');
         chatPanel.style.display   = mode === 'chat'   ? 'block' : 'none';
         searchPanel.style.display = mode === 'search' ? 'block' : 'none';
+        aiQueryOption.style.display = mode === 'chat' ? 'flex' : 'none';
         searchButtonText.textContent = mode === 'chat' ? 'Ask' : 'Search';
         searchInput.placeholder = mode === 'chat'
             ? 'Ask a question about company information...'
@@ -726,6 +754,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     question,
                     sources,
                     conversation_history: conversationHistory,
+                    use_ai_query: useAiQuery.checked,
                 }),
             });
 

@@ -171,7 +171,7 @@ class CompanyAssistantService:
                     "type": source_type,
                     "date": date[:10] if date else "",
                 }
-                if source_type == "notion" and snippet and snippet != "Notion document match":
+                if snippet and snippet not in ("Notion document match",):
                     source_entry["snippet"] = snippet[:300].strip()
                 sources.append(source_entry)
 

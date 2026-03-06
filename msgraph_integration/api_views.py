@@ -1400,11 +1400,15 @@ class AssistantChatAPIView(APIView):
 
         sources = request.data.get('sources', ['sharepoint', 'teams', 'email'])
         conversation_history = request.data.get('conversation_history', [])
+        use_ai_query = request.data.get('use_ai_query', True)
 
         try:
-            # Stage 1: Extract search keywords via LLM
+            # Stage 1: Extract search keywords via LLM (skipped when use_ai_query=False)
             assistant = CompanyAssistantService()
-            keywords = assistant.extract_search_keywords(question)
+            if use_ai_query:
+                keywords = assistant.extract_search_keywords(question)
+            else:
+                keywords = question
 
             # Stage 2: Search selected sources in parallel using threads
             import concurrent.futures
@@ -1430,6 +1434,11 @@ class AssistantChatAPIView(APIView):
                     use_reranking=False,
                 )
                 if _notion_result_count(primary) > 0:
+                    return primary
+
+                # Only attempt a fallback when the AI rewrote the query — if the
+                # user's raw input was used directly, a second identical pass adds nothing.
+                if not use_ai_query:
                     return primary
 
                 logger.warning(

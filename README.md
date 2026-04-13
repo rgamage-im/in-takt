@@ -50,6 +50,14 @@ in-takt/
 
 ## 🔧 Setup Instructions
 
+## 🐍 Python Environment
+
+This repository already includes a local virtual environment at `venv/` on this machine.
+
+- Before running `python`, `pip`, `pytest`, or `manage.py`, activate it with `source venv/bin/activate`.
+- If a session reports missing Python packages, verify the shell is using `venv/bin/python` before concluding dependencies are unavailable.
+- Only create a new virtual environment if `venv/` is actually missing for that checkout.
+
 ### Prerequisites
 
 - Python 3.12+
@@ -68,6 +76,8 @@ in-takt/
 
 2. **Create and activate virtual environment:**
    ```bash
+   # If venv/ already exists, just activate it.
+   # Only run the next line when venv/ does not exist yet.
    python3 -m venv venv
    source venv/bin/activate
    ```
@@ -193,15 +203,19 @@ Features:
 
 ```bash
 # Run all tests
+source venv/bin/activate
 pytest
 
 # Run with coverage
+source venv/bin/activate
 pytest --cov
 
 # Run specific app tests
+source venv/bin/activate
 pytest msgraph_integration/tests/
 
 # Run with verbose output
+source venv/bin/activate
 pytest -v
 ```
 

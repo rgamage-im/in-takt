@@ -399,7 +399,7 @@ pytz==2025.2
     # via -r requirements.in
 pyyaml==6.0.3
     # via drf-spectacular
-redis==7.1.0
+redis==7.1.1
     # via
     #   -r requirements.in
     #   django-redis

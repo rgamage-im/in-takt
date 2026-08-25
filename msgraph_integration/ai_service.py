@@ -1,8 +1,9 @@
 """
 Company Assistant AI Service
-Integrates Groq (Llama 4 Scout) to synthesize search results into natural language answers.
+Integrates Groq to synthesize search results into natural language answers.
 Groq API docs: https://console.groq.com/docs/openai
-Set the GROQ_API_KEY environment variable with a key from https://console.groq.com/keys
+Set GROQ_API_KEY with a key from https://console.groq.com/keys.
+Optionally set GROQ_MODEL to override the default model.
 """
 import os
 import json
@@ -19,10 +20,7 @@ class CompanyAssistantService:
       3. Synthesize results into a cited English-language answer
     """
 
-    # Groq model — fast, cheap, strong at RAG synthesis.
-    # Alternatives: "llama-3.3-70b-versatile", "qwen-qwen3-32b"
-    # MODEL = "meta-llama/llama-4-scout-17b-16e-instruct"
-    MODEL = "llama-3.3-70b-versatile"
+    DEFAULT_MODEL = "openai/gpt-oss-120b"
     GROQ_ENDPOINT = "https://api.groq.com/openai/v1"
 
     def __init__(self):
@@ -32,6 +30,8 @@ class CompanyAssistantService:
                 "GROQ_API_KEY environment variable is not set. "
                 "Get a free key at https://console.groq.com/keys"
             )
+
+        self.model = os.getenv("GROQ_MODEL", self.DEFAULT_MODEL).strip() or self.DEFAULT_MODEL
 
         self.client = OpenAI(
             base_url=self.GROQ_ENDPOINT,
@@ -57,7 +57,7 @@ class CompanyAssistantService:
         concise search query string suitable for Microsoft Graph Search.
         """
         response = self.client.chat.completions.create(
-            model=self.MODEL,
+            model=self.model,
             temperature=0,
             max_tokens=60,
             messages=[
@@ -241,7 +241,7 @@ class CompanyAssistantService:
         )
 
         response = self.client.chat.completions.create(
-            model=self.MODEL,
+            model=self.model,
             temperature=0.2,
             max_tokens=800,
             messages=messages,

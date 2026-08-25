@@ -84,6 +84,17 @@ Name: MICROSOFT_GRAPH_REDIRECT_URI
 Value: https://in-takt-portal-ezgqh2c2a2dsdyfu.westus2-01.azurewebsites.net/graph/callback/
 ```
 
+#### Company Assistant AI (Groq)
+```
+Name: GROQ_API_KEY
+Value: <your-groq-api-key>
+```
+
+```
+Name: GROQ_MODEL
+Value: openai/gpt-oss-120b
+```
+
 #### QuickBooks API
 ```
 Name: QUICKBOOKS_CLIENT_ID

@@ -20,6 +20,8 @@ Add these environment variables:
 - [ ] MICROSOFT_GRAPH_CLIENT_SECRET=`<your-client-secret>`
 - [ ] MICROSOFT_GRAPH_TENANT_ID=`<your-tenant-id>`
 - [ ] MICROSOFT_GRAPH_REDIRECT_URI=https://in-takt-portal-ezgqh2c2a2dsdyfu.westus2-01.azurewebsites.net/graph/callback/
+- [ ] GROQ_API_KEY=`<your-groq-api-key>`
+- [ ] GROQ_MODEL=openai/gpt-oss-120b
 - [ ] QUICKBOOKS_CLIENT_ID=`<your-quickbooks-client-id>`
 - [ ] QUICKBOOKS_CLIENT_SECRET=`<your-quickbooks-client-secret>`
 - [ ] QUICKBOOKS_REALM_ID=`<your-realm-id>`

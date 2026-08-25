@@ -91,3 +91,6 @@ logs/
 
 # OS
 Thumbs.db
+
+# Claude Code local settings
+.claude/settings.local.json

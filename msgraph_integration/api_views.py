@@ -110,6 +110,70 @@ def _notion_result_count(payload: dict | None) -> int:
     return 0
 
 
+def _graph_result_count(payload: dict | None) -> int:
+    """Count Microsoft Graph Search hits in a /search/query response."""
+    if not isinstance(payload, dict):
+        return 0
+
+    count = 0
+    for request_result in payload.get("value", []):
+        if not isinstance(request_result, dict):
+            continue
+        for container in request_result.get("hitsContainers", []):
+            if isinstance(container, dict) and isinstance(container.get("hits"), list):
+                count += len(container["hits"])
+    return count
+
+
+def _should_retry_original_query(
+    *,
+    result_count: int,
+    use_ai_query: bool,
+    rewritten_query: str,
+    original_question: str,
+) -> bool:
+    """Retry only when an actual AI rewrite produced no search results."""
+    return (
+        result_count == 0
+        and use_ai_query
+        and rewritten_query.strip() != original_question.strip()
+    )
+
+
+def _search_graph_with_fallback(
+    *,
+    graph_service,
+    access_token: str,
+    rewritten_query: str,
+    original_question: str,
+    use_ai_query: bool,
+    source_name: str,
+    entity_types=None,
+    size: int = 10,
+) -> dict:
+    """Search Graph with the AI query, retrying the original question on zero hits."""
+    search_kwargs = {"size": size}
+    if entity_types is not None:
+        search_kwargs["entity_types"] = entity_types
+
+    primary = graph_service.global_search(access_token, rewritten_query, **search_kwargs)
+    if not _should_retry_original_query(
+        result_count=_graph_result_count(primary),
+        use_ai_query=use_ai_query,
+        rewritten_query=rewritten_query,
+        original_question=original_question,
+    ):
+        return primary
+
+    logger.warning(
+        "assistant_graph_fallback source=%s query_keywords=%r query_full_question=%r reason=no_results_on_keywords",
+        source_name,
+        rewritten_query,
+        original_question,
+    )
+    return graph_service.global_search(access_token, original_question, **search_kwargs)
+
+
 def parse_amount_from_filename(filename):
     """
     Parse transaction amount from expense receipt filename.
@@ -1417,13 +1481,36 @@ class AssistantChatAPIView(APIView):
             search_results = {}
 
             def search_sharepoint():
-                return graph_service.global_search(access_token, keywords, size=10)
+                return _search_graph_with_fallback(
+                    graph_service=graph_service,
+                    access_token=access_token,
+                    rewritten_query=keywords,
+                    original_question=question,
+                    use_ai_query=use_ai_query,
+                    source_name="sharepoint",
+                )
 
             def search_teams():
-                return graph_service.global_search(access_token, keywords, entity_types=["chatMessage"], size=10)
+                return _search_graph_with_fallback(
+                    graph_service=graph_service,
+                    access_token=access_token,
+                    rewritten_query=keywords,
+                    original_question=question,
+                    use_ai_query=use_ai_query,
+                    source_name="teams",
+                    entity_types=["chatMessage"],
+                )
 
             def search_email():
-                return graph_service.global_search(access_token, keywords, entity_types=["message"], size=10)
+                return _search_graph_with_fallback(
+                    graph_service=graph_service,
+                    access_token=access_token,
+                    rewritten_query=keywords,
+                    original_question=question,
+                    use_ai_query=use_ai_query,
+                    source_name="email",
+                    entity_types=["message"],
+                )
 
             def search_notion():
                 primary = _search_notion_rag(
@@ -1433,12 +1520,12 @@ class AssistantChatAPIView(APIView):
                     vector_weight=0.5,
                     use_reranking=False,
                 )
-                if _notion_result_count(primary) > 0:
-                    return primary
-
-                # Only attempt a fallback when the AI rewrote the query — if the
-                # user's raw input was used directly, a second identical pass adds nothing.
-                if not use_ai_query:
+                if not _should_retry_original_query(
+                    result_count=_notion_result_count(primary),
+                    use_ai_query=use_ai_query,
+                    rewritten_query=keywords,
+                    original_question=question,
+                ):
                     return primary
 
                 logger.warning(
@@ -1467,9 +1554,10 @@ class AssistantChatAPIView(APIView):
                     futures['notion'] = executor.submit(search_notion)
 
                 source_timeouts = {
-                    "sharepoint": 20,
-                    "teams": 20,
-                    "email": 20,
+                    # Graph sources may perform rewritten-query + original-question searches.
+                    "sharepoint": 40,
+                    "teams": 40,
+                    "email": 40,
                     # Notion may do keyword search + fallback full-question search.
                     "notion": 45,
                 }
@@ -2367,5 +2455,4 @@ class ListNotificationsAPIView(APIView):
             'notifications': data,
             'count': len(data)
         })
-
 

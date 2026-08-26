@@ -58,6 +58,7 @@ class CompanyAssistantService:
         """
         response = self.client.chat.completions.create(
             model=self.model,
+            reasoning_effort="low",
             temperature=0,
             max_tokens=60,
             messages=[
@@ -65,9 +66,13 @@ class CompanyAssistantService:
                     "role": "system",
                     "content": (
                         f"You extract search keywords from questions. "
-                        "Return ONLY a short search query string (no explanation, no punctuation) "
-                        "that would find relevant documents in a corporate Microsoft 365 environment. "
-                        "2-6 words maximum."
+                        "Return ONLY a short search query string with no explanation. "
+                        "The query should find relevant documents in a corporate Microsoft 365 environment. "
+                        "Preserve words or phrases enclosed in double quotation marks verbatim, "
+                        "including their surrounding quotation marks, so they remain exact phrases. "
+                        "When a quoted phrase is present, do not add generic intent words such as "
+                        "definition, meaning, information, or details. Avoid other punctuation. "
+                        "Use 2-6 content words maximum."
                     ),
                 },
                 {

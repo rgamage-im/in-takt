@@ -10,6 +10,15 @@
         margin: 0 auto;
     }
 
+    .source-warning {
+        background: #fff3cd;
+        border-left: 4px solid #ffc107;
+        border-radius: 0.375rem;
+        color: #856404;
+        margin-bottom: 0.75rem;
+        padding: 0.75rem;
+    }
+
     /* Mode toggle */
     .mode-toggle {
         display: flex;
@@ -773,7 +782,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 throw new Error(`Server returned non-JSON response (HTTP ${response.status})`);
             }
 
-            if (data.auth_required) {
+            if (data.auth_required || response.status === 401) {
                 showAuthRequired(data.login_url);
                 return;
             }
@@ -827,11 +836,19 @@ document.addEventListener('DOMContentLoaded', function () {
             ? `<div class="chat-keywords">Searched for: ${escapeHtml(data.keywords)}</div>`
             : '';
 
+        const unavailableSources = Array.isArray(data.unavailable_sources)
+            ? data.unavailable_sources.join(', ')
+            : '';
+        const warningHtml = data.warning
+            ? `<div class="source-warning"><strong>Incomplete results:</strong> ${escapeHtml(data.warning)}${unavailableSources ? ` Unavailable: ${escapeHtml(unavailableSources)}.` : ''}</div>`
+            : '';
+
         const turnEl = document.createElement('div');
         turnEl.className = 'chat-turn';
         turnEl.innerHTML = `
             <div class="chat-question">${escapeHtml(question)}</div>
             <div class="chat-answer">
+                ${warningHtml}
                 ${keywordsHtml}
                 <div class="chat-answer-text">${escapeHtml(data.answer)}</div>
                 ${sourcesHtml}
@@ -874,7 +891,12 @@ document.addEventListener('DOMContentLoaded', function () {
             const authCheck = async (url, type) => {
                 const r = await fetch(url);
                 const data = await r.json();
-                if (data.auth_required) throw { authRequired: true, loginUrl: data.login_url };
+                if (data.auth_required || r.status === 401) {
+                    throw { authRequired: true, loginUrl: data.login_url };
+                }
+                if (!r.ok) {
+                    throw new Error(data.error || `Search failed for ${type} (HTTP ${r.status})`);
+                }
                 return { type, data };
             };
 

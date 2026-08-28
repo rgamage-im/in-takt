@@ -1,10 +1,13 @@
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
+from rest_framework.test import APIRequestFactory
+
 from django.test import SimpleTestCase
 
 from .ai_service import CompanyAssistantService
-from .api_views import _graph_result_count, _search_graph_with_fallback
+from .api_views import AssistantChatAPIView, _graph_result_count, _search_graph_with_fallback
+from .services_delegated import GraphTokenExpiredError
 
 
 class CompanyAssistantServiceTests(SimpleTestCase):
@@ -130,3 +133,99 @@ class AssistantSearchFallbackTests(SimpleTestCase):
         graph_service.global_search.assert_called_once_with(
             "token", "project budget", size=10, entity_types=["message"]
         )
+
+
+class AssistantExpiredTokenTests(SimpleTestCase):
+    def setUp(self):
+        self.factory = APIRequestFactory()
+
+    @patch("msgraph_integration.api_views._log_company_assistant_search")
+    @patch("msgraph_integration.api_views.GraphServiceDelegated")
+    @patch("msgraph_integration.ai_service.CompanyAssistantService")
+    def test_graph_expiration_is_not_swallowed_when_notion_succeeds(
+        self,
+        mock_assistant_class,
+        mock_graph_service_class,
+        _mock_log,
+    ):
+        assistant = mock_assistant_class.return_value
+        assistant.extract_search_keywords.return_value = "project budget"
+        graph_service = mock_graph_service_class.return_value
+        graph_service.global_search.side_effect = GraphTokenExpiredError("expired")
+
+        request = self.factory.post(
+            "/graph/api/assistant/chat/",
+            {
+                "question": "What happened to the project budget?",
+                "sources": ["sharepoint", "notion"],
+            },
+            format="json",
+        )
+        request.session = {
+            "graph_access_token": "expired-token",
+            "graph_refresh_token": "stale-refresh-token",
+            "graph_token_expires_in": 3600,
+        }
+
+        with patch(
+            "msgraph_integration.api_views._search_notion_rag",
+            return_value={"results": [{"content": "Notion-only result"}]},
+        ):
+            response = AssistantChatAPIView.as_view()(request)
+
+        self.assertEqual(response.status_code, 401)
+        self.assertTrue(response.data["auth_required"])
+        self.assertEqual(response.data["login_url"], "/graph/login/")
+        self.assertNotIn("graph_access_token", request.session)
+        self.assertNotIn("graph_refresh_token", request.session)
+        self.assertNotIn("graph_token_expires_in", request.session)
+        assistant.chat.assert_not_called()
+
+    def test_missing_graph_token_returns_auth_required_marker(self):
+        request = self.factory.post(
+            "/graph/api/assistant/chat/",
+            {"question": "What happened?", "sources": ["notion"]},
+            format="json",
+        )
+        request.session = {}
+
+        response = AssistantChatAPIView.as_view()(request)
+
+        self.assertEqual(response.status_code, 401)
+        self.assertTrue(response.data["auth_required"])
+        self.assertEqual(response.data["login_url"], "/graph/login/")
+
+    @patch("msgraph_integration.api_views._log_company_assistant_search")
+    @patch("msgraph_integration.api_views.GraphServiceDelegated")
+    @patch("msgraph_integration.ai_service.CompanyAssistantService")
+    def test_non_auth_source_failure_marks_partial_answer_incomplete(
+        self,
+        mock_assistant_class,
+        mock_graph_service_class,
+        _mock_log,
+    ):
+        assistant = mock_assistant_class.return_value
+        assistant.extract_search_keywords.return_value = "project budget"
+        assistant.chat.return_value = {"answer": "Notion found a budget note.", "sources": []}
+        graph_service = mock_graph_service_class.return_value
+        graph_service.global_search.side_effect = RuntimeError("Graph unavailable")
+
+        request = self.factory.post(
+            "/graph/api/assistant/chat/",
+            {
+                "question": "What happened to the project budget?",
+                "sources": ["sharepoint", "notion"],
+            },
+            format="json",
+        )
+        request.session = {"graph_access_token": "valid-token"}
+
+        with patch(
+            "msgraph_integration.api_views._search_notion_rag",
+            return_value={"results": [{"content": "Notion result"}]},
+        ):
+            response = AssistantChatAPIView.as_view()(request)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["unavailable_sources"], ["sharepoint"])
+        self.assertIn("incomplete", response.data["warning"])

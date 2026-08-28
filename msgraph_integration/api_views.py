@@ -1445,7 +1445,11 @@ class AssistantChatAPIView(APIView):
         access_token = request.session.get('graph_access_token')
         if not access_token:
             return Response(
-                {'error': 'Not authenticated with Microsoft', 'login_url': '/graph/login/'},
+                {
+                    'auth_required': True,
+                    'error': 'Not authenticated with Microsoft',
+                    'login_url': '/graph/login/',
+                },
                 status=status.HTTP_401_UNAUTHORIZED
             )
 
@@ -1479,6 +1483,7 @@ class AssistantChatAPIView(APIView):
 
             graph_service = GraphServiceDelegated()
             search_results = {}
+            source_failures = {}
 
             def search_sharepoint():
                 return _search_graph_with_fallback(
@@ -1565,6 +1570,11 @@ class AssistantChatAPIView(APIView):
                     try:
                         timeout_seconds = source_timeouts.get(source_name, 20)
                         search_results[source_name] = future.result(timeout=timeout_seconds)
+                    except GraphTokenExpiredError:
+                        # Authentication failure is request-wide, not an empty result
+                        # for one source. Let the outer handler return a JSON 401 so
+                        # the client can stop and prompt the user to sign in again.
+                        raise
                     except Exception as exc:
                         logger.warning(
                             "assistant_source_search_failed source=%s error=%s",
@@ -1572,6 +1582,7 @@ class AssistantChatAPIView(APIView):
                             str(exc),
                         )
                         search_results[source_name] = None
+                        source_failures[source_name] = str(exc)
 
             # Stage 3: Synthesize answer with citations
             result = assistant.chat(
@@ -1585,11 +1596,18 @@ class AssistantChatAPIView(APIView):
 
             # Include keywords in response for transparency/debugging
             result['keywords'] = keywords
+            if source_failures:
+                result['unavailable_sources'] = sorted(source_failures)
+                result['warning'] = (
+                    'Some selected sources could not be searched, so this answer may be incomplete.'
+                )
 
             return Response(result, status=status.HTTP_200_OK)
 
         except GraphTokenExpiredError:
             request.session.pop('graph_access_token', None)
+            request.session.pop('graph_refresh_token', None)
+            request.session.pop('graph_token_expires_in', None)
             return Response(
                 {
                     'auth_required': True,
@@ -2455,4 +2473,3 @@ class ListNotificationsAPIView(APIView):
             'notifications': data,
             'count': len(data)
         })
-

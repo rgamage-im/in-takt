@@ -58,8 +58,14 @@ The server should already be running at: http://localhost:8000
 ### Step 4: Verify User Creation
 Open a new terminal and run:
 ```bash
+# WSL / Linux / macOS
 cd /home/rgamage/projects/in-takt
 source venv/bin/activate
+python manage.py shell
+
+# Windows
+cd C:\github\in-takt
+venv\Scripts\Activate.ps1
 python manage.py shell
 ```
 

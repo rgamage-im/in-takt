@@ -64,7 +64,7 @@ This repository already includes a local virtual environment at `venv/` on this 
 - PostgreSQL (or Azure PostgreSQL)
 - Redis (for caching and Celery)
 - Git
-- WSL/Ubuntu (for Windows development)
+- WSL/Ubuntu (optional — native Windows development works too; see the inline notes in each step)
 
 ### Installation
 
@@ -76,23 +76,42 @@ This repository already includes a local virtual environment at `venv/` on this 
 
 2. **Create and activate virtual environment:**
    ```bash
+   # WSL / Linux / macOS
    # If venv/ already exists, just activate it.
    # Only run the next line when venv/ does not exist yet.
    python3 -m venv venv
    source venv/bin/activate
    ```
+   ```powershell
+   # Windows
+   # If venv\ already exists, just activate it.
+   # Only run the next line when venv\ does not exist yet.
+   python -m venv venv
+   venv\Scripts\Activate.ps1   # in plain cmd: venv\Scripts\activate
+   ```
 
 3. **Install dependencies:**
    ```bash
+   # WSL / Linux / macOS
    pip install --upgrade pip
-   pip install -r requirements.txt
+   pip install -r requirements.txt -r requirements-dev.txt
+   ```
+   ```powershell
+   # Windows
+   pip install --upgrade pip
+   pip install -r requirements.txt -r requirements-dev.txt
    ```
 
 4. **Configure environment variables:**
    ```bash
+   # WSL / Linux / macOS
    cp .env.example .env
-   # Edit .env with your actual credentials
    ```
+   ```powershell
+   # Windows
+   copy .env.example .env
+   ```
+   Then edit `.env` with your actual credentials.
 
 5. **Run migrations:**
    ```bash
@@ -106,6 +125,11 @@ This repository already includes a local virtual environment at `venv/` on this 
 
 7. **Run development server:**
    ```bash
+   # WSL / Linux / macOS
+   python manage.py runserver
+   ```
+   ```powershell
+   # Windows — or just double-click "IN-TAKT -start-devserver.cmd"
    python manage.py runserver
    ```
 

@@ -17,8 +17,16 @@ MICROSOFT_GRAPH_REDIRECT_URI=http://localhost:8000/graph/callback/
 
 ### Step 3: Test
 ```bash
+# WSL / Linux / macOS
 cd /home/rgamage/projects/in-takt
 source venv/bin/activate
+python manage.py runserver
+```
+
+```powershell
+# Windows
+cd C:\github\in-takt
+venv\Scripts\Activate.ps1
 python manage.py runserver
 ```
 
@@ -99,11 +107,19 @@ This means:
 
 ### Start Server
 ```bash
+# Windows
+venv\Scripts\python manage.py runserver
+
+# WSL
 wsl bash -c "cd /home/rgamage/projects/in-takt && source venv/bin/activate && python manage.py runserver"
 ```
 
 ### Check for Errors
 ```bash
+# Windows
+venv\Scripts\python manage.py check
+
+# WSL
 wsl bash -c "cd /home/rgamage/projects/in-takt && source venv/bin/activate && python manage.py check"
 ```
 

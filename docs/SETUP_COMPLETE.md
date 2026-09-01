@@ -65,6 +65,10 @@ MICROSOFT_GRAPH_TENANT_ID=your-tenant-id
 ### Step 2: Test the Connection
 
 ```bash
+# Windows
+venv\Scripts\python test_graph.py
+
+# WSL
 wsl bash -c "source venv/bin/activate && python test_graph.py"
 ```
 
@@ -76,6 +80,10 @@ This will verify:
 ### Step 3: Start the Server
 
 ```bash
+# Windows
+venv\Scripts\python manage.py runserver
+
+# WSL
 wsl bash -c "source venv/bin/activate && python manage.py runserver"
 ```
 

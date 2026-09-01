@@ -2,13 +2,11 @@
 * GitHub repo https://github.com/rgamage-im/in-takt.git
 
 ## Development Environment
-* Windows 11 machine, running WSL Ubuntu
-* Scripts and app are stored and run on the Ubuntu machine
-* Files are mapped to a windows folder, accessed by VS Code, for editing source files
-* Development testing - run web app in WSL instance, access from Windows 11 browser
+* Windows 11 machine; the repo now lives natively at `C:\github\in-takt` (was previously developed under WSL Ubuntu — both still work)
+* Development testing - run the web app from the checkout above and access it from your Windows browser (or via WSL if you prefer)
 * This checkout includes a local Python virtual environment at `venv/`
-* Activate it before running Python tooling: `source venv/bin/activate`
-* If `python`, `pytest`, or `manage.py` report missing modules, first confirm the shell is using `venv/bin/python`
+* Activate it before running Python tooling: `venv\Scripts\Activate.ps1` (PowerShell) / `venv\Scripts\activate` (cmd) / `source venv/bin/activate` (WSL/bash)
+* If `python`, `pytest`, or `manage.py` report missing modules, first confirm the shell is using the venv's python (`venv\Scripts\python` on Windows, `venv/bin/python` in WSL)
 
 ## Architecture Goals
 * Code should be modular whenever possible, for ease of maintenance and extensibility

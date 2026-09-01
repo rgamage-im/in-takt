@@ -44,8 +44,14 @@ MICROSOFT_GRAPH_REDIRECT_URI=http://localhost:8000/graph/callback/
 
 ### Step 1: Start Django Server
 ```bash
+# WSL / Linux / macOS
 cd /home/rgamage/projects/in-takt
 source venv/bin/activate
+python manage.py runserver
+
+# Windows
+cd C:\github\in-takt
+venv\Scripts\Activate.ps1
 python manage.py runserver
 ```
 

@@ -57,7 +57,13 @@ When RAG API is offline, the dashboard shows:
 
 2. **Start Django Server**:
    ```bash
+   # WSL / Linux / macOS
    source venv/bin/activate
+   python manage.py runserver 8080
+   ```
+   ```powershell
+   # Windows
+   venv\Scripts\activate
    python manage.py runserver 8080
    ```
 
